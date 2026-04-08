@@ -1,153 +1,240 @@
 import { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './AuthContext';
+import SADashboard from './components/SADashboard';
+import ManageAdmins from './components/ManageAdmins';
+import PropertyAdminDashboard from './components/PropertyAdminDashboard';
+import ManageTenants from './components/ManageTenants';
+import OccupancyGrid from './components/OccupancyGrid';
+import AdminPaymentMethods from './components/AdminPaymentMethods';
+import ComplaintsManager from './components/ComplaintsManager';
+import AdminPaymentsManager from './components/AdminPaymentsManager';
+import TenantPayRent from './components/TenantPayRent';
+import TenantPaymentHistory from './components/TenantPaymentHistory';
+import TenantRequests from './components/TenantRequests';
+import TenantSettings from './components/TenantSettings';
+import TenantDashboard from './components/TenantDashboard';
+import Messages from './components/Messages';
+import SASubscriptions from './components/SASubscriptions';
+import SAPayments from './components/SAPayments';
+import SAAnnouncements from './components/SAAnnouncements';
 
-// --- MOCK DATA ---
-const MOCK = {
-  users: { sa: { name: 'Supreme Admin', role: 'sa', frozen: false },
-           admin: { name: 'Property Admin', role: 'admin', frozen: false, tenantLimit: 50, tenantCount: 32, sub: { plan: 'Monthly', fee: 'KSh 2,500', due: '2026-05-01', status: 'Active' } },
-           tenant: { name: 'John Doe', role: 'tenant', frozen: false, status: 'good', dueDate: '2026-04-10', rent: 15000, lastPay: { amt: 15000, date: '2026-03-05' } } },
-  tenants: [
-    { id: 1, name: 'Alice M.', house: 'A1', status: 'good', rent: 12000 },
-    { id: 2, name: 'Bob K.', house: 'B3', status: 'pending', rent: 15000 },
-    { id: 3, name: 'Carol N.', house: 'C2', status: 'overdue', rent: 18000 },
-  ],
-  announcements: [{ id: 1, subject: 'System Maintenance', message: 'Scheduled for April 10', priority: 'Important' }]
-};
+const LoginScreen = () => {
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-// --- UTILS ---
-const daysLeft = (d) => Math.ceil((new Date(d) - new Date()) / 86400000);
-const statusColor = (s) => s === 'good' ? 'status-green' : s === 'pending' ? 'status-amber' : 'status-red';
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await login(email, password);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-// --- COMPONENTS ---
-const Login = ({ onLogin, isDark }) => {
-  const [role, setRole] = useState('admin');
-  const [frozen, setFrozen] = useState(false);
   return (
     <div className="login-box card">
       <h2>🏢 DomusEA Login</h2>
-      <p style={{color:'var(--gray)', margin:'12px 0'}}>Select a role to preview the dashboard</p>
-      <select value={role} onChange={e=>setRole(e.target.value)} style={{padding:8, width:'100%', marginBottom:12, borderRadius:4}}>
-        <option value="sa">Supreme Admin</option>
-        <option value="admin">Property Admin</option>
-        <option value="tenant">Tenant</option>
-      </select>
-      {frozen && <div className="card" style={{background:'var(--red)', color:'white', marginBottom:12}}>❄️ Account Frozen</div>}
-      <button className="btn btn-primary" style={{width:'100%'}} onClick={()=>{
-        setFrozen(MOCK.users[role].frozen);
-        if(!MOCK.users[role].frozen) onLogin(role);
-      }}>Log In</button>
-      <button className="btn" style={{marginTop:8, background:'var(--border)'}} onClick={()=>document.body.classList.toggle('dark')}>{isDark ? '☀️ Light' : '🌙 Dark'}</button>
+      <form onSubmit={handleLogin}>
+        <input 
+          type="email" 
+          placeholder="Email" 
+          value={email} 
+          onChange={e => setEmail(e.target.value)} 
+          required 
+          style={{padding: 8, width: '100%', marginBottom: 8, border: '1px solid var(--border)', borderRadius: 4}} 
+        />
+        <input 
+          type="password" 
+          placeholder="Password" 
+          value={password} 
+          onChange={e => setPassword(e.target.value)} 
+          required 
+          style={{padding: 8, width: '100%', marginBottom: 12, border: '1px solid var(--border)', borderRadius: 4}} 
+        />
+        {error && <p style={{color: 'var(--red)', marginBottom: 8}}>{error}</p>}
+        <button className="btn btn-primary" type="submit" disabled={loading} style={{width: '100%'}}>
+          {loading ? 'Logging in...' : 'Log In'}
+        </button>
+      </form>
     </div>
   );
 };
 
-const Sidebar = ({ role, active, onNav, toggleTheme, isDark, mobileOpen, setMobile }) => {
-  const links = { sa: ['Dashboard', 'Manage Admins', 'Subscriptions', 'Announcements', 'Activity Log'],
-                admin: ['Dashboard', 'Tenants', 'Payments', 'Complaints', 'Messages', 'Settings'],
-                tenant: ['Dashboard', 'Pay Rent', 'History', 'Requests', 'Messages', 'Tips'] };
+const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role }) => {
+  if (!role) return null;
+  
   return (
-    <>
-      <div className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
-        <h3 style={{marginBottom:16}}>🏠 DomusEA</h3>
-        {links[role].map(l => <button key={l} className={`nav-btn ${active===l?'active':''}`} onClick={()=>onNav(l)}>{l}</button>)}
-        <button className="btn" style={{marginTop:'auto', background:'transparent', border:'1px solid var(--border)'}} onClick={toggleTheme}>{isDark?'☀️':'🌙'} Theme</button>
-        <button className="btn" style={{marginTop:8, background:'var(--red)', color:'white'}} onClick={()=>window.location.reload()}>Logout</button>
-      </div>
-      {mobileOpen && <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.3)', zIndex:40}} onClick={()=>setMobile(false)}/>}
-    </>
-  );
-};
+    <div className="sidebar">
+      <h3 style={{marginBottom: 16}}>🏠 DomusEA</h3>
+      
+      {role === 'sa' && (
+        <>
+          <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
+          <button className={`nav-btn ${active==='admins'?'active':''}`} onClick={()=>onNav('admins')}>Manage Admins</button>
+          <button className={`nav-btn ${active==='subscriptions'?'active':''}`} onClick={()=>onNav('subscriptions')}>Subscriptions</button>
+          <button className={`nav-btn ${active==='payments'?'active':''}`} onClick={()=>onNav('payments')}>Payments</button>
+          <button className={`nav-btn ${active==='announcements'?'active':''}`} onClick={()=>onNav('announcements')}>Announcements</button>
+          <button className={`nav-btn ${active==='messages'?'active':''}`} onClick={()=>onNav('messages')}>Messages</button>
+        </>
+      )}
+      
+      {role === 'admin' && (
+        <>
+          <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
+          <button className={`nav-btn ${active==='tenants'?'active':''}`} onClick={()=>onNav('tenants')}>Manage Tenants</button>
+          <button className={`nav-btn ${active==='occupancy'?'active':''}`} onClick={()=>onNav('occupancy')}>Occupancy Grid</button>
+          <button className={`nav-btn ${active==='payment-methods'?'active':''}`} onClick={()=>onNav('payment-methods')}>Payment Methods</button>
+          <button className={`nav-btn ${active==='payments'?'active':''}`} onClick={()=>onNav('payments')}>Payments</button>
+          <button className={`nav-btn ${active==='complaints'?'active':''}`} onClick={()=>onNav('complaints')}>Complaints</button>
+          <button className={`nav-btn ${active==='messages'?'active':''}`} onClick={()=>onNav('messages')}>Messages</button>
+        </>
+      )}
 
-const SADashboard = () => (
-  <div>
-    <h2>Supreme Admin Dashboard</h2>
-    <div className="grid" style={{marginTop:16}}>
-      <div className="card"><h3>Admins</h3><p>12 Active</p></div>
-      <div className="card"><h3>Tenants System-wide</h3><p>482</p></div>
-      <div className="card"><h3>Revenue (Admin Subscriptions)</h3><p className="status-green">KSh 34,200</p></div>
-    </div>
-    <div className="card" style={{marginTop:16}}><h3>Recent Announcements</h3>{MOCK.announcements.map(a=><div key={a.id}><strong>{a.subject}</strong> <span className="badge">{a.priority}</span><p>{a.message}</p></div>)}</div>
-  </div>
-);
+      {role === 'tenant' && (
+        <>
+          <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
+          <button className={`nav-btn ${active==='pay'?'active':''}`} onClick={()=>onNav('pay')}>Pay Rent</button>
+          <button className={`nav-btn ${active==='history'?'active':''}`} onClick={()=>onNav('history')}>Payment History</button>
+          <button className={`nav-btn ${active==='requests'?'active':''}`} onClick={()=>onNav('requests')}>My Requests</button>
+          <button className={`nav-btn ${active==='settings'?'active':''}`} onClick={()=>onNav('settings')}>Settings</button>
+          <button className={`nav-btn ${active==='messages'?'active':''}`} onClick={()=>onNav('messages')}>Messages</button>
+        </>
+      )}
 
-const AdminDashboard = () => {
-  const u = MOCK.users.admin;
-  return (
-    <div>
-      <h2>Property Admin Dashboard</h2>
-      <div className="grid" style={{marginTop:16}}>
-        <div className="card"><h3>Occupancy</h3><p>{u.tenantCount}/{u.tenantLimit} Units</p></div>
-        <div className="card"><h3>Subscription</h3><p>{u.sub.plan} • {u.sub.status} • Due {u.sub.due}</p></div>
-        <div className="card"><h3>Quick Action</h3><button className="btn btn-primary">Send Bulk Reminders</button></div>
-      </div>
-      <div className="card" style={{marginTop:16}}>
-        <h3>Tenant Overview</h3>
-        <table style={{width:'100%', textAlign:'left', borderCollapse:'collapse'}}>
-          <thead><tr style={{borderBottom:'1px solid var(--border)'}}><th>Name</th><th>House</th><th>Rent</th><th>Status</th></tr></thead>
-          <tbody>{MOCK.tenants.map(t=><tr key={t.id} style={{borderBottom:'1px solid var(--border)'}}>
-            <td style={{padding:'8px 0'}}>{t.name}</td><td>{t.house}</td><td>KSh {t.rent}</td><td className={statusColor(t.status)}>{t.status.toUpperCase()}</td>
-          </tr>)}</tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-
-const TenantDashboard = () => {
-  const t = MOCK.users.tenant;
-  const days = daysLeft(t.dueDate);
-  const urgent = days <= 3 || days < 0;
-  return (
-    <div>
-      <h2>Welcome, {t.name}</h2>
-      {urgent && <div className="card" style={{borderLeft:`4px solid var(--red)`, background:'rgba(239,68,68,0.1)'}}>⚠️ Rent {days<0?'OVERDUE by '+Math.abs(days)+' days':'DUE in '+days+' days'}</div>}
-      <div className="grid" style={{marginTop:16}}>
-        <div className="card"><h3>Current Status</h3><p className={statusColor(t.status)}>{t.status.toUpperCase()}</p></div>
-        <div className="card"><h3>Amount Due</h3><p style={{fontSize:24, fontWeight:700}}>KSh {t.rent}</p></div>
-        <div className="card"><h3>Last Payment</h3><p>KSh {t.lastPay.amt} on {t.lastPay.date}</p></div>
-      </div>
-      <button className="btn btn-primary" style={{marginTop:16, padding:'12px 24px', fontSize:16}}>💳 Pay Rent Now</button>
+      {/* Theme Toggle Button */}
+      <button 
+        className="btn" 
+        style={{marginTop: 'auto', marginBottom: 8}} 
+        onClick={toggleTheme}
+      >
+        {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
+      </button>
+      
+      <button className="btn" style={{background: 'var(--red)', color: 'white'}} onClick={logout}>
+        Logout
+      </button>
     </div>
   );
 };
 
-// --- MAIN APP ---
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [page, setPage] = useState('Dashboard');
+const DashboardContent = ({ activePage, role, userProfile }) => {
+  if (!role) {
+    return <div className="card" style={{textAlign:'center', padding:40}}>Loading...</div>;
+  }
+
+  // Handle Messages page for all roles
+  if (activePage === 'messages') {
+    return <Messages userProfile={userProfile} />;
+  }
+
+  if (role === 'sa') {
+    switch (activePage) {
+      case 'admins': return <ManageAdmins />;
+      case 'subscriptions': return <SASubscriptions />;
+      case 'payments': return <SAPayments />;
+      case 'announcements': return <SAAnnouncements />;
+      default: return <SADashboard />;
+    }
+  }
+  
+  if (role === 'admin') {
+    switch (activePage) {
+      case 'tenants': return <ManageTenants />;
+      case 'occupancy': return <OccupancyGrid />;
+      case 'payment-methods': return <AdminPaymentMethods />;
+      case 'payments': return <AdminPaymentsManager />;
+      case 'complaints': return <ComplaintsManager />;
+      default: return <PropertyAdminDashboard />;
+    }
+  }
+
+  if (role === 'tenant') {
+    switch (activePage) {
+      case 'dashboard': return <TenantDashboard />;
+      case 'pay': return <TenantPayRent />;
+      case 'history': return <TenantPaymentHistory />;
+      case 'requests': return <TenantRequests />;
+      case 'settings': return <TenantSettings />;
+      default: return <TenantDashboard />;
+    }
+  }
+
+  return <div className="card"><h2>Welcome</h2><p>Role: {role}</p></div>;
+};
+
+const AppContent = () => {
+  const { userProfile, logout } = useAuth();
   const [isDark, setIsDark] = useState(false);
-  const [mobileOpen, setMobile] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [activePage, setActivePage] = useState('dashboard');
 
+  // Load saved theme preference
   useEffect(() => {
-    const handler = e => { e.preventDefault(); setDeferredPrompt(e); };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDark(true);
+      document.body.classList.add('dark');
+    }
   }, []);
 
-  const handleInstall = () => { if(deferredPrompt) deferredPrompt.prompt(); };
+  // Toggle theme function
+  const toggleTheme = () => {
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    
+    if (newTheme) {
+      document.body.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.body.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
-  if (!user) return <Login onLogin={r=>setUser(MOCK.users[r])} isDark={isDark} />;
+  if (!userProfile) {
+    return <LoginScreen />;
+  }
 
   return (
-    <div className={isDark?'dark':''}>
+    <div className={isDark ? 'dark' : ''}>
       <div className="mobile-header">
-        <button className="btn" onClick={()=>setMobile(true)}>☰ Menu</button>
+        <button className="btn" onClick={() => setActivePage('dashboard')}>☰ Menu</button>
         <span>DomusEA</span>
-        <button className="btn" onClick={()=>window.location.reload()}>Logout</button>
+        <button className="btn" onClick={logout}>Logout</button>
       </div>
+      
       <div className="app">
-        <Sidebar role={user.role} active={page} onNav={p=>{setPage(p); setMobile(false)}} toggleTheme={()=>setIsDark(!isDark)} isDark={isDark} mobileOpen={mobileOpen} setMobile={setMobile} />
+        <Sidebar 
+          active={activePage} 
+          onNav={setActivePage} 
+          isDark={isDark} 
+          toggleTheme={toggleTheme} 
+          logout={logout} 
+          role={userProfile.role} 
+        />
+        
         <main className="main">
-          {deferredPrompt && <div className="card" style={{position:'fixed', bottom:20, right:20, zIndex:100, maxWidth:300}}>
-            <p>📲 Install DomusEA for offline access</p>
-            <button className="btn btn-primary" style={{marginTop:8}} onClick={handleInstall}>Install App</button>
-            <button className="btn" style={{marginLeft:8}} onClick={()=>setDeferredPrompt(null)}>Not now</button>
-          </div>}
-          {user.role==='sa' && <SADashboard />}
-          {user.role==='admin' && <AdminDashboard />}
-          {user.role==='tenant' && <TenantDashboard />}
+          <DashboardContent 
+            activePage={activePage} 
+            role={userProfile.role} 
+            userProfile={userProfile} 
+          />
         </main>
       </div>
     </div>
+  );
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
