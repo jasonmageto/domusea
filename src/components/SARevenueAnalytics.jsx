@@ -1,30 +1,21 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { 
-  BarChart, 
-  Bar, 
-  LineChart, 
-  Line, 
-  PieChart, 
-  Pie, 
-  Cell,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  AreaChart,
-  Area
-} from 'recharts';
+import { useAuth } from '../AuthContext';
 
 export default function SARevenueAnalytics() {
-  const [monthlyData, setMonthlyData] = useState([]);
-  const [adminData, setAdminData] = useState([]);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [averageMonthly, setAverageMonthly] = useState(0);
-  const [growthRate, setGrowthRate] = useState(0);
+  const { userProfile } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [revenueData, setRevenueData] = useState({
+    totalRevenue: 0,
+    averageMonthly: 0,
+    growthRate: 0,
+    thisMonth: 0,
+    lastMonth: 0,
+    confirmedPayments: 0,
+    pendingPayments: 0
+  });
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [adminBreakdown, setAdminBreakdown] = useState([]);
 
   useEffect(() => {
     fetchRevenueData();
@@ -32,258 +23,275 @@ export default function SARevenueAnalytics() {
 
   async function fetchRevenueData() {
     try {
-      // Fetch all confirmed payments
-      const {  payments } = await supabase
+      setLoading(true);
+      console.log('Fetching revenue analytics...');
+
+      // Fetch all payments - simpler query first
+      const { data: paymentsData, error } = await supabase
         .from('admin_to_sa_payments')
-        .select('amount, date, admin_id')
-        .eq('status', 'Confirmed')
+        .select('*')
         .order('date', { ascending: true });
 
-      if (!payments) {
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Raw payments data:', paymentsData);
+
+      if (!paymentsData || paymentsData.length === 0) {
+        console.log('No payments found');
         setLoading(false);
         return;
       }
 
-      // Calculate total revenue
-      const total = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      setTotalRevenue(total);
-
-      // Group by month (last 12 months)
-      const monthlyMap = {};
-      const currentDate = new Date();
-      
-      // Initialize last 12 months
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthlyMap[key] = {
-          month: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-          revenue: 0,
-          fullDate: date
-        };
-      }
-
-      // Populate with actual data
-      payments.forEach(payment => {
-        const paymentDate = new Date(payment.date);
-        const key = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`;
-        if (monthlyMap[key]) {
-          monthlyMap[key].revenue += parseFloat(payment.amount);
-        }
-      });
-
-      // Convert to array and calculate growth
-      const monthlyArray = Object.values(monthlyMap);
-      setMonthlyData(monthlyArray);
-
-      // Calculate average monthly revenue
-      const activeMonths = monthlyArray.filter(m => m.revenue > 0).length || 1;
-      setAverageMonthly(total / activeMonths);
-
-      // Calculate growth rate (last month vs current month)
-      if (monthlyArray.length >= 2) {
-        const lastMonth = monthlyArray[monthlyArray.length - 2].revenue;
-        const currentMonth = monthlyArray[monthlyArray.length - 1].revenue;
-        
-        let growth = 0;
-        if (lastMonth > 0) {
-          growth = ((currentMonth - lastMonth) / lastMonth) * 100;
-        } else if (currentMonth > 0) {
-          growth = 100;
-        }
-        setGrowthRate(growth);
-      }
-
-      // Group by admin for pie chart
-      const adminMap = {};
-      payments.forEach(payment => {
-        if (!adminMap[payment.admin_id]) {
-          adminMap[payment.admin_id] = 0;
-        }
-        adminMap[payment.admin_id] += parseFloat(payment.amount);
-      });
-
-      // Fetch admin names
-      const adminIds = Object.keys(adminMap);
-      if (adminIds.length > 0) {
-        const {  admins } = await supabase
-          .from('admins')
-          .select('id, name')
-          .in('id', adminIds);
-
-        const adminChartData = adminIds.map(id => {
-          const admin = admins?.find(a => a.id === id);
+      // Fetch admin details for each payment
+      const paymentsWithAdmins = await Promise.all(
+        paymentsData.map(async (payment) => {
+          const { data: adminData } = await supabase
+            .from('admins')
+            .select('name, email')
+            .eq('id', payment.admin_id)
+            .single();
+          
           return {
-            name: admin?.name || 'Unknown Admin',
-            value: adminMap[id]
+            ...payment,
+            admins: adminData
           };
-        }).filter(item => item.value > 0);
+        })
+      );
 
-        setAdminData(adminChartData);
+      console.log('Payments with admins:', paymentsWithAdmins);
+
+      // Calculate metrics
+      const confirmedPayments = paymentsWithAdmins.filter(p => p.status === 'Confirmed');
+      const pendingPayments = paymentsWithAdmins.filter(p => p.status === 'Pending');
+
+      const totalRevenue = confirmedPayments.reduce((sum, p) => {
+        const amount = parseFloat(p.amount) || 0;
+        return sum + amount;
+      }, 0);
+
+      // Group by month
+      const monthlyGroups = {};
+      const adminTotals = {};
+
+      confirmedPayments.forEach(payment => {
+        const date = new Date(payment.date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const amount = parseFloat(payment.amount) || 0;
+
+        // Monthly grouping
+        if (!monthlyGroups[monthKey]) {
+          monthlyGroups[monthKey] = 0;
+        }
+        monthlyGroups[monthKey] += amount;
+
+        // Admin grouping
+        const adminName = payment.admins?.name || 'Unknown Admin';
+        if (!adminTotals[adminName]) {
+          adminTotals[adminName] = 0;
+        }
+        adminTotals[adminName] += amount;
+      });
+
+      // Convert to arrays for charts
+      const monthlyChartData = Object.entries(monthlyGroups)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-6) // Last 6 months
+        .map(([month, revenue]) => ({
+          month: formatMonth(month),
+          revenue
+        }));
+
+      const adminChartData = Object.entries(adminTotals)
+        .map(([name, value]) => ({
+          name,
+          value
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5); // Top 5 admins
+
+      // Calculate this month vs last month
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      const thisMonthData = confirmedPayments.filter(p => {
+        const d = new Date(p.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+      
+      const thisMonthRevenue = thisMonthData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+      // Last month
+      let lastMonthMonth = currentMonth - 1;
+      let lastMonthYear = currentYear;
+      if (lastMonthMonth < 0) {
+        lastMonthMonth = 11;
+        lastMonthYear--;
       }
+
+      const lastMonthData = confirmedPayments.filter(p => {
+        const d = new Date(p.date);
+        return d.getMonth() === lastMonthMonth && d.getFullYear() === lastMonthYear;
+      });
+
+      const lastMonthRevenue = lastMonthData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+      // Calculate growth rate
+      let growthRate = 0;
+      if (lastMonthRevenue > 0) {
+        growthRate = ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+      } else if (thisMonthRevenue > 0) {
+        growthRate = 100; // New revenue
+      }
+
+      // Calculate average monthly
+      const numberOfMonths = Object.keys(monthlyGroups).length || 1;
+      const averageMonthly = totalRevenue / numberOfMonths;
+
+      setRevenueData({
+        totalRevenue,
+        averageMonthly,
+        growthRate,
+        thisMonth: thisMonthRevenue,
+        lastMonth: lastMonthRevenue,
+        confirmedPayments: confirmedPayments.length,
+        pendingPayments: pendingPayments.length
+      });
+
+      setMonthlyData(monthlyChartData);
+      setAdminBreakdown(adminChartData);
+
+      console.log('Revenue stats calculated:', {
+        totalRevenue,
+        averageMonthly,
+        growthRate,
+        thisMonth: thisMonthRevenue,
+        lastMonth: lastMonthRevenue
+      });
 
     } catch (error) {
       console.error('Error fetching revenue ', error);
+      alert('Failed to load revenue analytics. Please refresh the page.');
     } finally {
       setLoading(false);
     }
   }
 
-  const formatCurrency = (value) => {
-    return `KSh ${value.toLocaleString()}`;
+  const formatCurrency = (amount) => {
+    const num = parseFloat(amount) || 0;
+    return `KSh ${num.toLocaleString()}`;
   };
 
-  const formatYAxis = (value) => {
-    return `KSh ${(value / 1000).toFixed(0)}k`;
+  const formatMonth = (monthStr) => {
+    const [year, month] = monthStr.split('-');
+    const date = new Date(year, parseInt(month) - 1);
+    return date.toLocaleDateString('en-KE', { month: 'short', year: '2-digit' });
   };
-
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
   if (loading) {
-    return <div className="card" style={{textAlign: 'center', padding: 40}}>Loading analytics...</div>;
+    return (
+      <div style={{textAlign: 'center', padding: 40}}>
+        <div style={{fontSize: 24, marginBottom: 16}}>📊</div>
+        <div>Loading analytics...</div>
+      </div>
+    );
   }
 
   return (
     <div>
       {/* Header */}
-      <div style={{marginBottom: 24}}>
-        <h2 style={{margin: 0}}>📊 Revenue Analytics</h2>
-        <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>
-          Track subscription revenue and growth trends
-        </p>
+      <div style={{marginBottom: 32}}>
+        <h1 style={{margin: 0, fontSize: 28}}>📊 Revenue Analytics</h1>
+        <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Track subscription revenue and growth trends</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: 20,
+        marginBottom: 32
+      }}>
+        <div className="card" style={{borderLeft: '4px solid #3b82f6', padding: 20}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>TOTAL REVENUE</div>
+          <div style={{fontSize: 36, fontWeight: 700, color: '#3b82f6'}}>{formatCurrency(revenueData.totalRevenue)}</div>
+          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>All time</div>
+        </div>
+
+        <div className="card" style={{borderLeft: '4px solid #10b981', padding: 20}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>AVERAGE MONTHLY</div>
+          <div style={{fontSize: 36, fontWeight: 700, color: '#10b981'}}>{formatCurrency(revenueData.averageMonthly)}</div>
+          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>Per month</div>
+        </div>
+
+        <div className="card" style={{borderLeft: '4px solid #f59e0b', padding: 20}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>GROWTH RATE</div>
+          <div style={{fontSize: 36, fontWeight: 700, color: revenueData.growthRate >= 0 ? '#10b981' : '#ef4444'}}>
+            {revenueData.growthRate >= 0 ? '↑' : '↓'} {Math.abs(revenueData.growthRate).toFixed(1)}%
+          </div>
+          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>vs last month</div>
+        </div>
+
+        <div className="card" style={{borderLeft: '4px solid #8b5cf6', padding: 20}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>THIS MONTH</div>
+          <div style={{fontSize: 36, fontWeight: 700, color: '#8b5cf6'}}>{formatCurrency(revenueData.thisMonth)}</div>
+          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>
+            {revenueData.confirmedPayments} payments confirmed
+          </div>
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid" style={{marginBottom: 24}}>
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: 14}}>Total Revenue</h3>
-          <p style={{fontSize: 32, fontWeight: 700, margin: 0, color: 'var(--blue)'}}>
-            {formatCurrency(totalRevenue)}
-          </p>
-          <p style={{fontSize: 12, color: 'var(--gray)', margin: '4px 0 0 0'}}>All time</p>
-        </div>
-
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: 14}}>Average Monthly</h3>
-          <p style={{fontSize: 32, fontWeight: 700, margin: 0, color: 'var(--green)'}}>
-            {formatCurrency(Math.round(averageMonthly))}
-          </p>
-          <p style={{fontSize: 12, color: 'var(--gray)', margin: '4px 0 0 0'}}>Per month</p>
-        </div>
-
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: 14}}>Growth Rate</h3>
-          <p style={{fontSize: 32, fontWeight: 700, margin: 0, color: growthRate >= 0 ? 'var(--green)' : 'var(--red)'}}>
-            {growthRate >= 0 ? '↑' : '↓'} {Math.abs(growthRate).toFixed(1)}%
-          </p>
-          <p style={{fontSize: 12, color: 'var(--gray)', margin: '4px 0 0 0'}}>Month over month</p>
-        </div>
-
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: 14}}>Active Admins</h3>
-          <p style={{fontSize: 32, fontWeight: 700, margin: 0}}>
-            {adminData.length}
-          </p>
-          <p style={{fontSize: 12, color: 'var(--gray)', margin: '4px 0 0 0'}}>Contributing this year</p>
+      <div className="card" style={{padding: 20, marginBottom: 24}}>
+        <h3 style={{margin: '0 0 20px 0', fontSize: 18}}>Revenue Summary</h3>
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16}}>
+          <div style={{padding: 16, background: '#f0fdf4', borderRadius: 8, borderLeft: '4px solid #10b981'}}>
+            <div style={{fontSize: 13, color: '#059669', fontWeight: 600, marginBottom: 4}}>CONFIRMED PAYMENTS</div>
+            <div style={{fontSize: 24, fontWeight: 700, color: '#059669'}}>{revenueData.confirmedPayments}</div>
+          </div>
+          <div style={{padding: 16, background: '#fffbeb', borderRadius: 8, borderLeft: '4px solid #f59e0b'}}>
+            <div style={{fontSize: 13, color: '#d97706', fontWeight: 600, marginBottom: 4}}>PENDING PAYMENTS</div>
+            <div style={{fontSize: 24, fontWeight: 700, color: '#d97706'}}>{revenueData.pendingPayments}</div>
+          </div>
+          <div style={{padding: 16, background: '#eff6ff', borderRadius: 8, borderLeft: '4px solid #3b82f6'}}>
+            <div style={{fontSize: 13, color: '#2563eb', fontWeight: 600, marginBottom: 4}}>LAST MONTH</div>
+            <div style={{fontSize: 24, fontWeight: 700, color: '#2563eb'}}>{formatCurrency(revenueData.lastMonth)}</div>
+          </div>
+          <div style={{padding: 16, background: '#f5f3ff', borderRadius: 8, borderLeft: '4px solid #8b5cf6'}}>
+            <div style={{fontSize: 13, color: '#7c3aed', fontWeight: 600, marginBottom: 4}}>THIS MONTH</div>
+            <div style={{fontSize: 24, fontWeight: 700, color: '#7c3aed'}}>{formatCurrency(revenueData.thisMonth)}</div>
+          </div>
         </div>
       </div>
 
-      {/* Monthly Revenue Chart - Bar + Line */}
-      <div className="card" style={{marginBottom: 24}}>
-        <h3 style={{margin: '0 0 20px 0'}}>📈 Monthly Revenue Trend</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart  data={monthlyData}>
-            <defs>
-              <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="month" stroke="var(--gray)" />
-            <YAxis stroke="var(--gray)" tickFormatter={formatYAxis} />
-            <Tooltip formatter={(value) => formatCurrency(value)} />
-            <Legend />
-            <Area 
-              type="monotone" 
-              dataKey="revenue" 
-              name="Revenue" 
-              stroke="#3b82f6" 
-              fillOpacity={1} 
-              fill="url(#colorRevenue)" 
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Insights */}
+      {revenueData.totalRevenue > 0 && (
+        <div style={{padding: 16, background: 'rgba(59, 130, 246, 0.1)', borderRadius: 8, fontSize: 13, color: 'var(--text)'}}>
+          <strong>💡 Insights:</strong>
+          <ul style={{margin: '8px 0 0 0', paddingLeft: 20}}>
+            <li>Your average monthly revenue is {formatCurrency(revenueData.averageMonthly)}</li>
+            {revenueData.growthRate > 0 && (
+              <li>Revenue is growing by {revenueData.growthRate.toFixed(1)}% compared to last month 🎉</li>
+            )}
+            {revenueData.growthRate < 0 && (
+              <li>Revenue decreased by {Math.abs(revenueData.growthRate).toFixed(1)}% compared to last month</li>
+            )}
+            {revenueData.growthRate === 0 && revenueData.thisMonth > 0 && (
+              <li>Revenue is stable compared to last month</li>
+            )}
+          </ul>
+        </div>
+      )}
 
-      {/* Revenue by Admin - Pie Chart */}
-      <div className="card" style={{marginBottom: 24}}>
-        <h3 style={{margin: '0 0 20px 0'}}>💰 Revenue by Admin (Last 12 Months)</h3>
-        {adminData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={adminData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {adminData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => formatCurrency(value)} />
-            </PieChart>
-          </ResponsiveContainer>
-        ) : (
-          <p style={{textAlign: 'center', color: 'var(--gray)', padding: 40}}>
-            No revenue data available yet
-          </p>
-        )}
-      </div>
-
-      {/* Detailed Monthly Table */}
-      <div className="card">
-        <h3 style={{margin: '0 0 16px 0'}}>📋 Monthly Breakdown</h3>
-        <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse'}}>
-          <thead>
-            <tr style={{borderBottom: '2px solid var(--border)'}}>
-              <th style={{padding: '12px 0'}}>Month</th>
-              <th>Revenue</th>
-              <th>vs Previous Month</th>
-              <th>Cumulative</th>
-            </tr>
-          </thead>
-          <tbody>
-            {monthlyData.map((month, index) => {
-              const prevMonth = index > 0 ? monthlyData[index - 1].revenue : 0;
-              const change = prevMonth > 0 ? ((month.revenue - prevMonth) / prevMonth) * 100 : 0;
-              const cumulative = monthlyData.slice(0, index + 1).reduce((sum, m) => sum + m.revenue, 0);
-              
-              return (
-                <tr key={month.month} style={{borderBottom: '1px solid var(--border)'}}>
-                  <td style={{padding: '12px 0'}}>{month.month}</td>
-                  <td>{formatCurrency(month.revenue)}</td>
-                  <td>
-                    {index === 0 ? (
-                      <span style={{color: 'var(--gray)'}}>-</span>
-                    ) : (
-                      <span style={{color: change >= 0 ? 'var(--green)' : 'var(--red)'}}>
-                        {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
-                      </span>
-                    )}
-                  </td>
-                  <td>{formatCurrency(cumulative)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {revenueData.totalRevenue === 0 && (
+        <div style={{marginTop: 24, padding: 32, textAlign: 'center', background: 'rgba(0,0,0,0.05)', borderRadius: 8}}>
+          <div style={{fontSize: 48, marginBottom: 16}}>📈</div>
+          <p style={{margin: 0, color: 'var(--gray)'}}>No revenue data yet. Payments will appear here once admins start renewing their subscriptions.</p>
+        </div>
+      )}
     </div>
   );
 }

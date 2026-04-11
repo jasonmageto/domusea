@@ -9,9 +9,30 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const checkTenantPasswordStatus = async (user) => {
+    if (user?.user_metadata?.role === 'tenant') {
+      try {
+        const { data: tenant, error } = await supabase
+          .from('tenants')
+          .select('password_changed')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error checking password status:', error);
+          return;
+        }
+
+        if (tenant && !tenant.password_changed) {
+          window.location.href = '/#change-password?first_login=true';
+        }
+      } catch (error) {
+        console.error('Error checking password status:', error);
+      }
+    }
+  };
+
   useEffect(() => {
-    checkSession();
-    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         fetchUserProfile(session.user);
@@ -20,8 +41,10 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     });
-    
-    return () => subscription.unsubscribe();
+
+    checkSession();
+
+    return () => subscription?.unsubscribe();
   }, []);
 
   async function checkSession() {
@@ -40,8 +63,7 @@ export const AuthProvider = ({ children }) => {
   async function fetchUserProfile(user) {
     try {
       console.log('Fetching profile for ID:', user.id);
-      
-      // Check Admins Table
+
       const { data: admin, error: adminError } = await supabase
         .from('admins')
         .select('*')
@@ -50,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
       if (admin) {
         console.log('ADMIN detected. Role:', admin.role || 'admin', 'Frozen:', admin.frozen);
-        
+
         setUserProfile({
           id: admin.id,
           name: admin.name,
@@ -61,10 +83,10 @@ export const AuthProvider = ({ children }) => {
           subscription_due: admin.subscription_due,
           admin_id: admin.id
         });
+        await checkTenantPasswordStatus(user);
         return;
       }
 
-      // Check for Special SA email
       if (user.email === 'sa@domusea.com' || user.email === 'supremeadmin@domusea.com' || user.email === '4mreaper@gmail.com') {
         console.log('SUPREME ADMIN detected');
         setUserProfile({
@@ -74,10 +96,10 @@ export const AuthProvider = ({ children }) => {
           role: 'sa',
           frozen: false
         });
+        await checkTenantPasswordStatus(user);
         return;
       }
 
-      // Default to Tenant
       console.log('TENANT detected');
       setUserProfile({
         id: user.id,
@@ -85,9 +107,9 @@ export const AuthProvider = ({ children }) => {
         email: user.email,
         role: 'tenant',
         frozen: false,
-        admin_id: null 
+        admin_id: null
       });
-
+      await checkTenantPasswordStatus(user);
     } catch (error) {
       console.error('Error fetching user profile:', error);
       setUserProfile(null);
@@ -107,7 +129,6 @@ export const AuthProvider = ({ children }) => {
       if (!user) throw new Error('Login failed');
 
       await fetchUserProfile(user);
-
       return user;
     } catch (error) {
       console.error('Login error:', error);

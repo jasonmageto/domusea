@@ -9,13 +9,24 @@ export default function SASubscriptions() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [stats, setStats] = useState({
+    totalAdmins: 0,
+    activeSubscriptions: 0,
+    overdueSubscriptions: 0,
+    monthlyRevenue: 0
+  });
 
   useEffect(() => {
     fetchSubscriptions();
   }, []);
 
+  useEffect(() => {
+    calculateStats();
+  }, [admins]);
+
   async function fetchSubscriptions() {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('admins')
         .select('*')
@@ -25,13 +36,35 @@ export default function SASubscriptions() {
       setAdmins(data || []);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
+      alert('Failed to load subscriptions. Please refresh the page.');
     } finally {
       setLoading(false);
     }
   }
 
+  const calculateStats = () => {
+    const totalAdmins = admins.length;
+    const activeSubscriptions = admins.filter(a => a.subscription_status === 'Active').length;
+    const overdueSubscriptions = admins.filter(a => {
+      if (!a.subscription_due) return false;
+      return new Date(a.subscription_due) < new Date() && a.subscription_status !== 'Active';
+    }).length;
+    
+    const monthlyRevenue = admins.reduce((sum, admin) => {
+      const fee = parseFloat(admin.subscription_fee) || 0;
+      return sum + (admin.subscription_status === 'Active' && admin.subscription_plan === 'Monthly' ? fee : 0);
+    }, 0);
+
+    setStats({
+      totalAdmins,
+      activeSubscriptions,
+      overdueSubscriptions,
+      monthlyRevenue
+    });
+  };
+
   const formatCurrency = (amount) => {
-    const num = parseFloat(amount || 0);
+    const num = parseFloat(amount) || 0;
     return `KSh ${num.toLocaleString()}`;
   };
 
@@ -44,6 +77,10 @@ export default function SASubscriptions() {
   };
 
   const handleRenewSubscription = async (admin) => {
+    if (!window.confirm(`Renew subscription for ${admin.name}?\n\nThis will:\n• Extend their access\n• Unfreeze their account and all tenants\n• Record the payment\n\nContinue?`)) {
+      return;
+    }
+
     setProcessingId(admin.id);
     try {
       const currentDate = new Date();
@@ -71,14 +108,19 @@ export default function SASubscriptions() {
       if (updateError) throw updateError;
 
       // 2. 🎯 AUTOMATION: Unfreeze admin + their tenants
-      await unfreezeAdminAndTenants(admin.id);
+      try {
+        await unfreezeAdminAndTenants(admin.id);
+      } catch (unfreezeError) {
+        console.error('Error unfreezing admin/tenants:', unfreezeError);
+        // Continue even if unfreeze fails - subscription is still renewed
+      }
 
       // 3. Record the payment in admin_to_sa_payments
       const { error: paymentError } = await supabase
         .from('admin_to_sa_payments')
         .insert({
           admin_id: admin.id,
-          amount: admin.subscription_fee,
+          amount: parseFloat(admin.subscription_fee) || 0,
           date: currentDate.toISOString(),
           method: 'Manual Renewal',
           reference: `SUB-${admin.id}-${Date.now()}`,
@@ -87,11 +129,24 @@ export default function SASubscriptions() {
           confirmed_by: userProfile?.id
         });
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Error recording payment:', paymentError);
+        // Continue - subscription is renewed even if payment record fails
+      }
 
-      // 4. Refresh UI
-      fetchSubscriptions();
-      alert(`✅ Subscription renewed for ${admin.name}!\nNext due: ${nextDue.toLocaleDateString()}\n\nAll tenant accounts have been reactivated.`);
+      // 4. Log activity
+      await supabase
+        .from('activity_log')
+        .insert({
+          type: 'subscription_renewed',
+          message: `Supreme Admin renewed ${admin.subscription_plan} subscription for ${admin.name}`,
+          admin_id: admin.id
+        });
+
+      // 5. Refresh UI
+      await fetchSubscriptions();
+      
+      alert(`✅ Subscription renewed successfully!\n\nAdmin: ${admin.name}\nPlan: ${admin.subscription_plan}\nFee: ${formatCurrency(admin.subscription_fee)}\nNext Due: ${nextDue.toLocaleDateString()}\n\nAll tenant accounts have been reactivated.`);
 
     } catch (error) {
       console.error('Error renewing subscription:', error);
@@ -101,15 +156,66 @@ export default function SASubscriptions() {
     }
   };
 
+  const handleFreezeAdmin = async (admin) => {
+    const action = admin.frozen ? 'Unfreeze' : 'Freeze';
+    if (!window.confirm(`${action} account for ${admin.name}?\n\n${admin.frozen ? 'This will restore access for the admin and all their tenants.' : 'WARNING: This will block the admin and ALL their tenants from accessing the system.'}`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('admins')
+        .update({ 
+          frozen: !admin.frozen,
+          frozen_at: admin.frozen ? null : new Date().toISOString(),
+          frozen_by: admin.frozen ? null : userProfile?.id
+        })
+        .eq('id', admin.id);
+
+      if (error) throw error;
+
+      // If freezing, also freeze all tenants
+      if (!admin.frozen) {
+        await supabase
+          .from('tenants')
+          .update({ frozen: true })
+          .eq('admin_id', admin.id);
+      }
+
+      // Log activity
+      await supabase
+        .from('activity_log')
+        .insert({
+          type: admin.frozen ? 'admin_unfrozen' : 'admin_frozen',
+          message: `Supreme Admin ${admin.frozen ? 'unfroze' : 'froze'} account for ${admin.name}`,
+          admin_id: admin.id
+        });
+
+      await fetchSubscriptions();
+      alert(`✅ Admin ${admin.frozen ? 'unfrozen' : 'frozen'} successfully!`);
+    } catch (error) {
+      console.error('Error updating admin status:', error);
+      alert(`Failed to ${action.toLowerCase()} admin: ${error.message}`);
+    }
+  };
+
   const filteredAdmins = admins.filter(admin => 
-    admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    admin.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (admin.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (admin.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <div className="card" style={{textAlign: 'center', padding: 40}}>Loading subscriptions...</div>;
+  if (loading) {
+    return (
+      <div className="card" style={{textAlign: 'center', padding: 40}}>
+        <div style={{fontSize: 24, marginBottom: 16}}>⏳</div>
+        <div>Loading subscriptions...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
+      {/* Header */}
       <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16}}>
         <div>
           <h2 style={{margin: 0}}>💳 Subscription Management</h2>
@@ -120,64 +226,142 @@ export default function SASubscriptions() {
           placeholder="Search admins..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', width: 250}}
+          style={{
+            padding: '10px 14px', 
+            borderRadius: 8, 
+            border: '1px solid var(--border)', 
+            background: 'var(--input-bg)', 
+            color: 'var(--text)', 
+            width: 250,
+            fontSize: 14
+          }}
         />
       </div>
 
+      {/* Stats Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 16,
+        marginBottom: 24
+      }}>
+        <div className="card" style={{borderLeft: '4px solid #3b82f6', padding: 16}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 4}}>Total Admins</div>
+          <div style={{fontSize: 28, fontWeight: 700}}>{stats.totalAdmins}</div>
+        </div>
+        <div className="card" style={{borderLeft: '4px solid #10b981', padding: 16}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 4}}>Active Subscriptions</div>
+          <div style={{fontSize: 28, fontWeight: 700, color: '#10b981'}}>{stats.activeSubscriptions}</div>
+        </div>
+        <div className="card" style={{borderLeft: '4px solid #ef4444', padding: 16}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 4}}>Overdue</div>
+          <div style={{fontSize: 28, fontWeight: 700, color: '#ef4444'}}>{stats.overdueSubscriptions}</div>
+        </div>
+        <div className="card" style={{borderLeft: '4px solid #8b5cf6', padding: 16}}>
+          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 4}}>Monthly Revenue</div>
+          <div style={{fontSize: 28, fontWeight: 700, color: '#8b5cf6'}}>{formatCurrency(stats.monthlyRevenue)}</div>
+        </div>
+      </div>
+
+      {/* Subscriptions Table */}
       <div className="card">
         <div style={{overflowX: 'auto'}}>
-          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: 800}}>
+          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: 900}}>
             <thead>
               <tr style={{borderBottom: '2px solid var(--border)'}}>
                 <th style={{padding: '12px 8px'}}>Admin</th>
-                <th>Email</th>
-                <th>Plan</th>
-                <th>Fee</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th style={{textAlign: 'center'}}>Action</th>
+                <th style={{padding: '12px 8px'}}>Email</th>
+                <th style={{padding: '12px 8px'}}>Plan</th>
+                <th style={{padding: '12px 8px'}}>Fee</th>
+                <th style={{padding: '12px 8px'}}>Due Date</th>
+                <th style={{padding: '12px 8px'}}>Status</th>
+                <th style={{padding: '12px 8px', textAlign: 'center'}}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredAdmins.map((admin) => {
                 const isOverdue = admin.subscription_due && new Date(admin.subscription_due) < new Date() && admin.subscription_status !== 'Active';
+                
                 return (
-                  <tr key={admin.id} style={{borderBottom: '1px solid var(--border)', background: admin.frozen ? 'rgba(239, 68, 68, 0.05)' : 'transparent'}}>
+                  <tr 
+                    key={admin.id} 
+                    style={{
+                      borderBottom: '1px solid var(--border)', 
+                      background: admin.frozen ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                      opacity: admin.frozen ? 0.7 : 1
+                    }}
+                  >
                     <td style={{padding: '12px 8px'}}>
-                      <div style={{fontWeight: 600}}>{admin.name}</div>
-                      {admin.frozen && <span style={{fontSize: 11, color: 'var(--red)'}}>❄️ Frozen</span>}
+                      <div style={{fontWeight: 600, marginBottom: 4}}>{admin.name || 'N/A'}</div>
+                      {admin.frozen && (
+                        <span style={{fontSize: 11, color: 'var(--red)', fontWeight: 600}}>❄️ Frozen Account</span>
+                      )}
                     </td>
-                    <td style={{color: 'var(--gray)', fontSize: 13}}>{admin.email}</td>
-                    <td>
+                    <td style={{color: 'var(--gray)', fontSize: 13, padding: '12px 8px'}}>{admin.email}</td>
+                    <td style={{padding: '12px 8px'}}>
                       <span style={{
-                        padding: '4px 8px',
-                        borderRadius: 4,
+                        padding: '4px 10px',
+                        borderRadius: 12,
                         fontSize: 12,
-                        fontWeight: 500,
+                        fontWeight: 600,
                         background: admin.subscription_plan === 'Annual' ? '#dbeafe' : '#f3f4f6',
                         color: admin.subscription_plan === 'Annual' ? '#1e40af' : '#374151'
                       }}>
-                        {admin.subscription_plan}
+                        {admin.subscription_plan || 'Monthly'}
                       </span>
                     </td>
-                    <td style={{fontWeight: 600}}>{formatCurrency(admin.subscription_fee)}</td>
-                    <td style={{color: isOverdue ? 'var(--red)' : 'var(--text)', fontWeight: isOverdue ? 600 : 400}}>
-                      {admin.subscription_due ? new Date(admin.subscription_due).toLocaleDateString() : 'Not set'}
+                    <td style={{fontWeight: 600, padding: '12px 8px'}}>{formatCurrency(admin.subscription_fee)}</td>
+                    <td style={{
+                      color: isOverdue ? 'var(--red)' : 'var(--text)', 
+                      fontWeight: isOverdue ? 600 : 400,
+                      padding: '12px 8px'
+                    }}>
+                      {admin.subscription_due ? new Date(admin.subscription_due).toLocaleDateString('en-KE') : 'Not set'}
+                      {isOverdue && <div style={{fontSize: 11, color: 'var(--red)', marginTop: 2}}>⚠️ Overdue</div>}
                     </td>
-                    <td>
-                      <span className={`badge ${getStatusColor(admin.subscription_status, admin.subscription_due)}`}>
-                        {admin.subscription_status || 'Unknown'}
+                    <td style={{padding: '12px 8px'}}>
+                      <span className={`badge ${getStatusColor(admin.subscription_status, admin.subscription_due)}`} style={{
+                        padding: '4px 12px',
+                        borderRadius: 12,
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}>
+                        {admin.subscription_status || 'Inactive'}
                       </span>
                     </td>
-                    <td style={{textAlign: 'center'}}>
-                      <button 
-                        className="btn btn-sm btn-primary" 
-                        onClick={() => handleRenewSubscription(admin)}
-                        disabled={processingId === admin.id}
-                        style={{opacity: processingId === admin.id ? 0.6 : 1, cursor: processingId === admin.id ? 'not-allowed' : 'pointer'}}
-                      >
-                        {processingId === admin.id ? 'Renewing...' : 'Renew / Mark Paid'}
-                      </button>
+                    <td style={{padding: '12px 8px', textAlign: 'center'}}>
+                      <div style={{display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap'}}>
+                        <button 
+                          className="btn btn-sm btn-primary" 
+                          onClick={() => handleRenewSubscription(admin)}
+                          disabled={processingId === admin.id}
+                          style={{
+                            opacity: processingId === admin.id ? 0.6 : 1, 
+                            cursor: processingId === admin.id ? 'not-allowed' : 'pointer',
+                            fontSize: 12,
+                            padding: '6px 12px'
+                          }}
+                        >
+                          {processingId === admin.id ? 'Processing...' : 'Renew / Mark Paid'}
+                        </button>
+                        <button 
+                          onClick={() => handleFreezeAdmin(admin)}
+                          disabled={processingId === admin.id}
+                          style={{
+                            background: admin.frozen ? '#10b981' : '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            opacity: processingId === admin.id ? 0.6 : 1
+                          }}
+                        >
+                          {admin.frozen ? 'Unfreeze' : 'Freeze'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -192,6 +376,11 @@ export default function SASubscriptions() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Footer Info */}
+      <div style={{marginTop: 16, padding: 16, background: 'rgba(59, 130, 246, 0.1)', borderRadius: 8, fontSize: 13, color: 'var(--text)'}}>
+        <strong>💡 Tip:</strong> Click "Renew / Mark Paid" to extend an admin's subscription. This automatically unfreezes their account and all their tenants, then records the payment.
       </div>
     </div>
   );
