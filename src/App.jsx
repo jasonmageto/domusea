@@ -17,7 +17,10 @@ import Messages from './components/Messages';
 import SASubscriptions from './components/SASubscriptions';
 import SAPayments from './components/SAPayments';
 import SAAnnouncements from './components/SAAnnouncements';
+import SARevenueAnalytics from './components/SARevenueAnalytics';
+import AdminRevenueAnalytics from './components/AdminRevenueAnalytics';
 
+// --- LOGIN SCREEN ---
 const LoginScreen = () => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -39,52 +42,298 @@ const LoginScreen = () => {
   };
 
   return (
-    <div className="login-box card">
-      <h2>🏢 DomusEA Login</h2>
-      <form onSubmit={handleLogin}>
-        <input 
-          type="email" 
-          placeholder="Email" 
-          value={email} 
-          onChange={e => setEmail(e.target.value)} 
-          required 
-          style={{padding: 8, width: '100%', marginBottom: 8, border: '1px solid var(--border)', borderRadius: 4}} 
-        />
-        <input 
-          type="password" 
-          placeholder="Password" 
-          value={password} 
-          onChange={e => setPassword(e.target.value)} 
-          required 
-          style={{padding: 8, width: '100%', marginBottom: 12, border: '1px solid var(--border)', borderRadius: 4}} 
-        />
-        {error && <p style={{color: 'var(--red)', marginBottom: 8}}>{error}</p>}
-        <button className="btn btn-primary" type="submit" disabled={loading} style={{width: '100%'}}>
-          {loading ? 'Logging in...' : 'Log In'}
-        </button>
-      </form>
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', fontFamily: "'Inter', sans-serif", background: '#fff' }}>
+      <div className="login-left" style={{
+        flex: 1,
+        background: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80') center/cover no-repeat`,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '60px',
+        color: 'white'
+      }}>
+        <div style={{ maxWidth: '450px' }}>
+          <h3 style={{ textTransform: 'uppercase', letterSpacing: '2px', fontSize: '14px', marginBottom: '20px', opacity: 0.8 }}>A WISE QUOTE</h3>
+          <h1 style={{ fontSize: '48px', lineHeight: '1.1', fontWeight: '700', marginBottom: '24px' }}>Build Better.<br/>Manage Smarter.</h1>
+          <p style={{ fontSize: '18px', lineHeight: '1.6', opacity: 0.9 }}>
+            "The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."
+          </p>
+        </div>
+      </div>
+
+      <div className="login-right" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', background: '#fff' }}>
+        <div style={{ width: '100%', maxWidth: '400px' }}>
+          <div style={{ marginBottom: '32px' }}>
+            <h2 style={{ fontSize: '32px', fontWeight: '600', color: '#111', margin: '0 0 8px 0' }}>Welcome Back</h2>
+            <p style={{ color: '#666', margin: 0 }}>Enter your credentials to access your account</p>
+          </div>
+
+          <form onSubmit={handleLogin}>
+            {error && (
+              <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px', color: '#333' }}>Email Address</label>
+              <input 
+                type="email" 
+                placeholder="Enter your email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                required 
+                style={{ width: '100%', padding: '12px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '16px', boxSizing: 'border-box' }} 
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px', color: '#333' }}>Password</label>
+              <input 
+                type="password" 
+                placeholder="Enter your password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                required 
+                style={{ width: '100%', padding: '12px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '16px', boxSizing: 'border-box' }} 
+              />
+            </div>
+
+            <button type="submit" disabled={loading} style={{ width: '100%', padding: '14px', background: '#111', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', marginBottom: '24px', opacity: loading ? 0.7 : 1 }}>
+              {loading ? 'Logging in...' : 'Sign In'}
+            </button>
+            
+            <p style={{ textAlign: 'center', color: '#888', fontSize: '14px' }}>Restricted Access • Authorized Personnel Only</p>
+          </form>
+        </div>
+      </div>
+
+      <style>{`@media (max-width: 768px) { .login-left { display: none !important; } .login-right { width: '100%; flex: none; } }`}</style>
     </div>
   );
 };
 
-const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role }) => {
+// --- SUBSCRIPTION EXPIRED PAGE (For Frozen Admins) ---
+const SubscriptionExpired = () => {
+  const { userProfile, logout } = useAuth();
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: 20
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: 16,
+        padding: 40,
+        maxWidth: 500,
+        width: '100%',
+        textAlign: 'center',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{
+          width: 80,
+          height: 80,
+          background: '#fee2e2',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 24px',
+          fontSize: 40
+        }}>
+          ⚠️
+        </div>
+
+        <h1 style={{ margin: '0 0 16px 0', color: '#111', fontSize: 28 }}>
+          Subscription Expired
+        </h1>
+
+        <p style={{ color: '#666', fontSize: 16, lineHeight: 1.6, marginBottom: 24 }}>
+          Your DomusEA admin account has been frozen due to an overdue subscription. 
+          To restore access to your property management dashboard, please renew your subscription.
+        </p>
+
+        <div style={{
+          background: '#f3f4f6',
+          borderRadius: 12,
+          padding: 20,
+          marginBottom: 24,
+          textAlign: 'left'
+        }}>
+          <h3 style={{ margin: '0 0 12px 0', color: '#111', fontSize: 16 }}>
+            📋 Account Details
+          </h3>
+          <div style={{ fontSize: 14, color: '#374151' }}>
+            <p style={{ margin: '8px 0' }}>
+              <strong>Name:</strong> {userProfile?.name}
+            </p>
+            <p style={{ margin: '8px 0' }}>
+              <strong>Email:</strong> {userProfile?.email}
+            </p>
+            <p style={{ margin: '8px 0' }}>
+              <strong>Subscription Due:</strong>{' '}
+              {userProfile?.subscription_due 
+                ? new Date(userProfile.subscription_due).toLocaleDateString('en-GB')
+                : 'Overdue'
+              }
+            </p>
+          </div>
+        </div>
+
+        <div style={{
+          background: '#eff6ff',
+          border: '2px solid #3b82f6',
+          borderRadius: 12,
+          padding: 20,
+          marginBottom: 24
+        }}>
+          <h3 style={{ margin: '0 0 12px 0', color: '#1e40af', fontSize: 16 }}>
+            📞 Contact to Renew
+          </h3>
+          <p style={{ margin: '0 0 12px 0', color: '#1e40af', fontSize: 14 }}>
+            Reach out to the The Administrator to renew your subscription:
+          </p>
+          <div style={{ fontSize: 14, color: '#1e40af' }}>
+            <p style={{ margin: '8px 0', fontWeight: 600 }}>
+              📱 Phone: 0711 333 436
+            </p>
+            <p style={{ margin: '8px 0' }}>
+              📧 Email: sa@domusea.com
+            </p>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          gap: 12,
+          justifyContent: 'center',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            onClick={logout}
+            style={{
+              padding: '12px 24px',
+              background: '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Logout
+          </button>
+          <button
+            onClick={() => window.location.href = 'tel:0711333436'}
+            style={{
+              padding: '12px 24px',
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            📞 Call Now
+          </button>
+          <button
+            onClick={() => window.location.href = 'mailto:sa@domusea.com?subject=Subscription Renewal Request'}
+            style={{
+              padding: '12px 24px',
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            📧 Email
+          </button>
+        </div>
+
+        <p style={{
+          margin: '24px 0 0 0',
+          fontSize: 12,
+          color: '#9ca3af'
+        }}>
+          Once your subscription is renewed, you'll regain full access to your dashboard.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// --- SIDEBAR WITH USER PROFILE ---
+const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role, user }) => {
   if (!role) return null;
   
   return (
     <div className="sidebar">
       <h3 style={{marginBottom: 16}}>🏠 DomusEA</h3>
+
+      {/* User Profile Card */}
+      <div style={{ 
+        padding: '12px', 
+        background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', 
+        borderRadius: '10px', 
+        marginBottom: '20px',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ 
+            width: '36px', height: '36px', 
+            background: 'var(--primary)', 
+            color: 'white', 
+            borderRadius: '50%', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            fontWeight: 'bold', fontSize: '14px'
+          }}>
+            {user?.name?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text)' }}>{user?.name || 'User'}</h4>
+            <p style={{ margin: 0, fontSize: '11px', color: 'var(--gray)', textTransform: 'capitalize' }}>
+              {role === 'sa' ? 'Supreme Admin' : role === 'admin' ? 'Property Admin' : 'Tenant'}
+            </p>
+          </div>
+        </div>
+        <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted)', wordBreak: 'break-all' }}>
+          {user?.email}
+        </p>
+        {role === 'admin' && user?.subscription_status && (
+          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '10px', color: 'var(--gray)' }}>Subscription</span>
+            <span style={{ fontSize: '10px', fontWeight: 'bold', color: user.subscription_status === 'Active' ? 'var(--green)' : 'var(--red)' }}>
+              {user.subscription_status}
+            </span>
+          </div>
+        )}
+      </div>
       
+      {/* Supreme Admin Navigation */}
       {role === 'sa' && (
         <>
           <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
           <button className={`nav-btn ${active==='admins'?'active':''}`} onClick={()=>onNav('admins')}>Manage Admins</button>
           <button className={`nav-btn ${active==='subscriptions'?'active':''}`} onClick={()=>onNav('subscriptions')}>Subscriptions</button>
+          <button className={`nav-btn ${active==='revenue'?'active':''}`} onClick={()=>onNav('revenue')}>Revenue Analytics</button>
           <button className={`nav-btn ${active==='payments'?'active':''}`} onClick={()=>onNav('payments')}>Payments</button>
           <button className={`nav-btn ${active==='announcements'?'active':''}`} onClick={()=>onNav('announcements')}>Announcements</button>
           <button className={`nav-btn ${active==='messages'?'active':''}`} onClick={()=>onNav('messages')}>Messages</button>
         </>
       )}
       
+      {/* Property Admin Navigation */}
       {role === 'admin' && (
         <>
           <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
@@ -92,11 +341,13 @@ const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role }) => {
           <button className={`nav-btn ${active==='occupancy'?'active':''}`} onClick={()=>onNav('occupancy')}>Occupancy Grid</button>
           <button className={`nav-btn ${active==='payment-methods'?'active':''}`} onClick={()=>onNav('payment-methods')}>Payment Methods</button>
           <button className={`nav-btn ${active==='payments'?'active':''}`} onClick={()=>onNav('payments')}>Payments</button>
+          <button className={`nav-btn ${active==='revenue'?'active':''}`} onClick={()=>onNav('revenue')}>Revenue Analytics</button>
           <button className={`nav-btn ${active==='complaints'?'active':''}`} onClick={()=>onNav('complaints')}>Complaints</button>
           <button className={`nav-btn ${active==='messages'?'active':''}`} onClick={()=>onNav('messages')}>Messages</button>
         </>
       )}
 
+      {/* Tenant Navigation */}
       {role === 'tenant' && (
         <>
           <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
@@ -108,12 +359,7 @@ const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role }) => {
         </>
       )}
 
-      {/* Theme Toggle Button */}
-      <button 
-        className="btn" 
-        style={{marginTop: 'auto', marginBottom: 8}} 
-        onClick={toggleTheme}
-      >
+      <button className="btn" style={{marginTop: 'auto', marginBottom: 8}} onClick={toggleTheme}>
         {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
       </button>
       
@@ -124,20 +370,17 @@ const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role }) => {
   );
 };
 
+// --- DASHBOARD CONTENT ROUTER ---
 const DashboardContent = ({ activePage, role, userProfile }) => {
-  if (!role) {
-    return <div className="card" style={{textAlign:'center', padding:40}}>Loading...</div>;
-  }
+  if (!role) return <div className="card" style={{textAlign:'center', padding:40}}>Loading...</div>;
 
-  // Handle Messages page for all roles
-  if (activePage === 'messages') {
-    return <Messages userProfile={userProfile} />;
-  }
+  if (activePage === 'messages') return <Messages userProfile={userProfile} />;
 
   if (role === 'sa') {
     switch (activePage) {
       case 'admins': return <ManageAdmins />;
       case 'subscriptions': return <SASubscriptions />;
+      case 'revenue': return <SARevenueAnalytics />;
       case 'payments': return <SAPayments />;
       case 'announcements': return <SAAnnouncements />;
       default: return <SADashboard />;
@@ -150,6 +393,7 @@ const DashboardContent = ({ activePage, role, userProfile }) => {
       case 'occupancy': return <OccupancyGrid />;
       case 'payment-methods': return <AdminPaymentMethods />;
       case 'payments': return <AdminPaymentsManager />;
+      case 'revenue': return <AdminRevenueAnalytics />;
       case 'complaints': return <ComplaintsManager />;
       default: return <PropertyAdminDashboard />;
     }
@@ -169,12 +413,13 @@ const DashboardContent = ({ activePage, role, userProfile }) => {
   return <div className="card"><h2>Welcome</h2><p>Role: {role}</p></div>;
 };
 
+// --- MAIN APP COMPONENT ---
 const AppContent = () => {
   const { userProfile, logout } = useAuth();
   const [isDark, setIsDark] = useState(false);
   const [activePage, setActivePage] = useState('dashboard');
 
-  // Load saved theme preference
+  // Theme toggle effect
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
@@ -183,11 +428,9 @@ const AppContent = () => {
     }
   }, []);
 
-  // Toggle theme function
   const toggleTheme = () => {
     const newTheme = !isDark;
     setIsDark(newTheme);
-    
     if (newTheme) {
       document.body.classList.add('dark');
       localStorage.setItem('theme', 'dark');
@@ -197,8 +440,14 @@ const AppContent = () => {
     }
   };
 
+  // Show login screen if not authenticated
   if (!userProfile) {
     return <LoginScreen />;
+  }
+
+  // ✅ CHECK IF FROZEN - Render subscription expired page
+  if (userProfile.role === 'admin' && userProfile.frozen) {
+    return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
   }
 
   return (
@@ -208,7 +457,6 @@ const AppContent = () => {
         <span>DomusEA</span>
         <button className="btn" onClick={logout}>Logout</button>
       </div>
-      
       <div className="app">
         <Sidebar 
           active={activePage} 
@@ -217,14 +465,10 @@ const AppContent = () => {
           toggleTheme={toggleTheme} 
           logout={logout} 
           role={userProfile.role} 
+          user={userProfile} 
         />
-        
         <main className="main">
-          <DashboardContent 
-            activePage={activePage} 
-            role={userProfile.role} 
-            userProfile={userProfile} 
-          />
+          <DashboardContent activePage={activePage} role={userProfile.role} userProfile={userProfile} />
         </main>
       </div>
     </div>
@@ -232,9 +476,5 @@ const AppContent = () => {
 };
 
 export default function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
+  return <AuthProvider><AppContent /></AuthProvider>;
 }

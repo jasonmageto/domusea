@@ -5,281 +5,205 @@ import { useAuth } from '../AuthContext';
 export default function OccupancyGrid() {
   const { userProfile } = useAuth();
   const [units, setUnits] = useState([]);
-  const [stats, setStats] = useState({ occupied: 0, vacant: 0 });
   const [loading, setLoading] = useState(true);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedUnit, setSelectedUnit] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', rent: '', status: 'good', due_date: '' });
-  const [saving, setSaving] = useState(false);
-
-  const DEFAULT_UNITS = [];
-  for (let i = 1; i <= 20; i++) DEFAULT_UNITS.push(`A${i}`);
-  for (let i = 1; i <= 20; i++) DEFAULT_UNITS.push(`B${i}`);
 
   useEffect(() => {
-    if (userProfile?.id) {
-      fetchGridData();
-    }
-  }, [userProfile]);
+    fetchOccupancyData();
+  }, []);
 
-  async function fetchGridData() {
+  async function fetchOccupancyData() {
     try {
-      console.log('🔍 Fetching tenants for admin:', userProfile.id);
-      
-      const result = await supabase
+      // 1. Fetch all tenants for this admin
+      const { data: tenants } = await supabase
         .from('tenants')
-        .select('id, house, status, name, rent, due_date, email')
-        .eq('admin_id', userProfile.id);
+        .select('id, name, house, property, rent, due_date, status')
+        .eq('admin_id', userProfile.id)
+        .eq('status', 'Active');
 
-      console.log('📦 Raw result:', result);
-      console.log('📦 Result data:', result.data);
-      console.log('📦 Result error:', result.error);
+      // 2. Fetch all payments for these tenants
+      const tenantIds = tenants?.map(t => t.id) || [];
+      const { data: payments } = tenantIds.length > 0 
+        ? await supabase
+            .from('payments')
+            .select('tenant_id, amount, date, status')
+            .in('tenant_id', tenantIds)
+            .order('date', { ascending: false })
+        : { data: [] };
 
-      if (result.error) {
-        console.error('❌ Query error:', result.error);
-        setLoading(false);
-        return;
-      }
+      // 3. Build unit grid with proper status colors
+      const unitMap = {};
+      
+      // Add all tenant units
+      tenants?.forEach(tenant => {
+        const tenantPayments = payments?.filter(p => p.tenant_id === tenant.id) || [];
+        const latestPayment = tenantPayments[0];
+        const today = new Date();
+        const dueDate = new Date(tenant.due_date);
+        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
 
-      const tenants = result.data || [];
-      console.log('✅ Found tenants:', tenants);
-      console.log('📊 Tenant count:', tenants.length);
-
-      const grid = DEFAULT_UNITS.map(unitLabel => {
-        const normalizedUnit = unitLabel.toString().toUpperCase().trim();
+        // Determine status and color
+        let status, color, statusLabel;
         
-        const tenant = tenants.find(t => {
-          const normalizedHouse = t.house?.toString().toUpperCase().trim();
-          return normalizedHouse === normalizedUnit;
-        });
+        if (latestPayment?.status === 'Confirmed') {
+          // Check if payment covers current period
+          const paymentDate = new Date(latestPayment.date);
+          const nextDueDate = new Date(dueDate);
+          
+          if (paymentDate >= dueDate && dueDate >= today) {
+            status = 'paid';
+            color = '#10b981'; // Green
+            statusLabel = 'Paid';
+          } else if (daysUntilDue <= 0) {
+            status = 'overdue';
+            color = '#ef4444'; // Red
+            statusLabel = 'Overdue';
+          } else {
+            status = 'pending';
+            color = '#f59e0b'; // Amber
+            statusLabel = 'Pending';
+          }
+        } else if (latestPayment?.status === 'Pending') {
+          status = 'pending';
+          color = '#f59e0b'; // Amber
+          statusLabel = 'Payment Pending';
+        } else {
+          // No payment or failed payment
+          if (daysUntilDue <= 0) {
+            status = 'overdue';
+            color = '#ef4444'; // Red
+            statusLabel = 'Overdue';
+          } else if (daysUntilDue <= 3) {
+            status = 'pending';
+            color = '#f59e0b'; // Amber
+            statusLabel = 'Due Soon';
+          } else {
+            status = 'pending';
+            color = '#f59e0b'; // Amber
+            statusLabel = 'Unpaid';
+          }
+        }
 
-        return {
-          unit: unitLabel,
-          status: tenant ? (tenant.status || 'good') : 'vacant',
-          id: tenant ? tenant.id : null,
-          name: tenant ? tenant.name : null,
-          rent: tenant ? tenant.rent : null,
-          due_date: tenant ? tenant.due_date : null,
-          email: tenant ? tenant.email : null
+        unitMap[tenant.house] = {
+          id: tenant.id,
+          name: tenant.name,
+          rent: tenant.rent,
+          status,
+          color,
+          statusLabel,
+          daysUntilDue
         };
       });
 
-      console.log('📋 Generated grid with occupied units:', grid.filter(u => u.status !== 'vacant'));
-      
-      setUnits(grid);
-      setStats({
-        occupied: tenants.length,
-        vacant: DEFAULT_UNITS.length - tenants.length
+      // 4. Generate standard unit list (A1-A20, B1-B16, etc.)
+      const allUnits = [];
+      const prefixes = ['A', 'B', 'C'];
+      const ranges = { A: 20, B: 16, C: 12 };
+
+      prefixes.forEach(prefix => {
+        for (let i = 1; i <= ranges[prefix]; i++) {
+          const unitCode = `${prefix}${i}`;
+          if (unitMap[unitCode]) {
+            allUnits.push({ code: unitCode, ...unitMap[unitCode], occupied: true });
+          } else {
+            allUnits.push({
+              code: unitCode,
+              occupied: false,
+              status: 'vacant',
+              color: '#94a3b8', // Grey
+              statusLabel: 'VACANT'
+            });
+          }
+        }
       });
 
-    } catch (err) {
-      console.error('💥 Error:', err);
+      setUnits(allUnits);
+    } catch (error) {
+      console.error('Error fetching occupancy:', error);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleUnitClick(unit) {
-    const unitData = units.find(u => u.unit === unit);
-    
-    if (unitData && unitData.status !== 'vacant') {
-      setSelectedUnit(unitData);
-      setEditForm({
-        name: unitData.name || '',
-        rent: unitData.rent || '',
-        status: unitData.status || 'good',
-        due_date: unitData.due_date || ''
-      });
-      setShowEditModal(true);
-    }
+  if (loading) {
+    return <div className="card" style={{textAlign: 'center', padding: 40}}>Loading grid...</div>;
   }
-
-  async function handleUpdateTenant(e) {
-    e.preventDefault();
-    if (!selectedUnit?.id) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({
-          name: editForm.name,
-          rent: parseFloat(editForm.rent),
-          status: editForm.status,
-          due_date: editForm.due_date
-        })
-        .eq('id', selectedUnit.id);
-
-      if (error) throw error;
-      
-      setShowEditModal(false);
-      await fetchGridData();
-    } catch (err) {
-      console.error('Update error:', err);
-      alert('Failed to update: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'good': return 'var(--green)';
-      case 'pending': return 'var(--amber)';
-      case 'overdue': return 'var(--red)';
-      default: return 'var(--gray)';
-    }
-  };
-
-  if (loading) return <div className="card" style={{textAlign: 'center', padding: '40px'}}>Loading Grid...</div>;
 
   return (
     <div>
-      <h2 style={{marginBottom: 24}}>Occupancy Grid</h2>
-
-      <div className="grid" style={{marginBottom: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))'}}>
-        <div className="card" style={{textAlign: 'center', borderLeft: `4px solid var(--green)`}}>
-          <p style={{margin: 0, fontSize: 14, color: 'var(--gray)'}}>Occupied</p>
-          <p style={{margin: '8px 0 0', fontSize: 32, fontWeight: 'bold', color: 'var(--green)'}}>{stats.occupied}</p>
+      <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div>
+          <h2 style={{margin: 0}}>🏢 Occupancy Grid</h2>
+          <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>
+            {units.filter(u => u.occupied).length} occupied / {units.length} total units
+          </p>
         </div>
-        <div className="card" style={{textAlign: 'center', borderLeft: `4px solid var(--gray)`}}>
-          <p style={{margin: 0, fontSize: 14, color: 'var(--gray)'}}>Vacant</p>
-          <p style={{margin: '8px 0 0', fontSize: 32, fontWeight: 'bold', color: 'var(--gray)'}}>{stats.vacant}</p>
-        </div>
-        <div className="card" style={{textAlign: 'center', borderLeft: `4px solid var(--blue)`}}>
-          <p style={{margin: 0, fontSize: 14, color: 'var(--gray)'}}>Total Units</p>
-          <p style={{margin: '8px 0 0', fontSize: 32, fontWeight: 'bold'}}>{DEFAULT_UNITS.length}</p>
-        </div>
-      </div>
-
-      <div className="card" style={{marginBottom: 24}}>
-        <div style={{display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center'}}>
-          <strong>Legend:</strong>
-          <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
-            <span style={{width: 16, height: 16, borderRadius: 4, background: 'var(--green)'}}></span> Good
+        
+        {/* Legend */}
+        <div style={{display: 'flex', gap: 16, fontSize: 13}}>
+          <span style={{display: 'flex', alignItems: 'center', gap: 6}}>
+            <span style={{width: 12, height: 12, borderRadius: 3, background: '#10b981'}}></span> Paid
           </span>
-          <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
-            <span style={{width: 16, height: 16, borderRadius: 4, background: 'var(--amber)'}}></span> Pending
+          <span style={{display: 'flex', alignItems: 'center', gap: 6}}>
+            <span style={{width: 12, height: 12, borderRadius: 3, background: '#f59e0b'}}></span> Pending
           </span>
-          <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
-            <span style={{width: 16, height: 16, borderRadius: 4, background: 'var(--red)'}}></span> Overdue
+          <span style={{display: 'flex', alignItems: 'center', gap: 6}}>
+            <span style={{width: 12, height: 12, borderRadius: 3, background: '#ef4444'}}></span> Overdue
           </span>
-          <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
-            <span style={{width: 16, height: 16, borderRadius: 4, background: 'var(--gray)'}}></span> Vacant
+          <span style={{display: 'flex', alignItems: 'center', gap: 6}}>
+            <span style={{width: 12, height: 12, borderRadius: 3, background: '#94a3b8'}}></span> Vacant
           </span>
         </div>
       </div>
 
-      <div className="card">
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12}}>
-          {units.map(u => (
-            <div 
-              key={u.unit}
-              onClick={() => handleUnitClick(u.unit)}
-              style={{
-                background: getStatusColor(u.status),
-                color: u.status === 'vacant' ? 'var(--text)' : 'white',
-                padding: 16,
-                borderRadius: 8,
-                textAlign: 'center',
-                minHeight: 100,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                cursor: 'pointer',
-                opacity: u.status === 'vacant' ? 0.6 : 1,
-                transition: 'transform 0.2s'
-              }}
-              title={u.status !== 'vacant' ? `Unit: ${u.unit}\nTenant: ${u.name}\nRent: KSh ${u.rent}` : `Unit ${u.unit} - Vacant`}
-            >
-              <strong style={{fontSize: 18}}>{u.unit}</strong>
-              {u.status !== 'vacant' ? (
-                <>
-                  <div style={{fontSize: 12, marginTop: 4, opacity: 0.9}}>
-                    {u.name?.split(' ')[0]}
-                  </div>
-                  <div style={{fontSize: 10, marginTop: 2, opacity: 0.7}}>
-                    KSh {u.rent}
-                  </div>
-                </>
-              ) : (
-                <span style={{fontSize: 10, marginTop: 4, opacity: 0.6}}>VACANT</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {showEditModal && selectedUnit && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{width: '90%', maxWidth: 500}}>
-            <h3 style={{marginTop: 0}}>Edit Unit {selectedUnit.unit}</h3>
-            <form onSubmit={handleUpdateTenant}>
-              <div style={{marginBottom: 16}}>
-                <label style={{display: 'block', marginBottom: 4, fontWeight: 500}}>Tenant Name</label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={e => setEditForm({...editForm, name: e.target.value})}
-                  required
-                  style={{width: '100%'}}
-                />
-              </div>
-              <div style={{marginBottom: 16}}>
-                <label style={{display: 'block', marginBottom: 4, fontWeight: 500}}>Monthly Rent (KSh)</label>
-                <input
-                  type="number"
-                  value={editForm.rent}
-                  onChange={e => setEditForm({...editForm, rent: e.target.value})}
-                  required
-                  style={{width: '100%'}}
-                />
-              </div>
-              <div style={{marginBottom: 16}}>
-                <label style={{display: 'block', marginBottom: 4, fontWeight: 500}}>Due Date</label>
-                <input
-                  type="date"
-                  value={editForm.due_date}
-                  onChange={e => setEditForm({...editForm, due_date: e.target.value})}
-                  style={{width: '100%'}}
-                />
-              </div>
-              <div style={{marginBottom: 16}}>
-                <label style={{display: 'block', marginBottom: 4, fontWeight: 500}}>Payment Status</label>
-                <select
-                  value={editForm.status}
-                  onChange={e => setEditForm({...editForm, status: e.target.value})}
-                  style={{width: '100%'}}
-                >
-                  <option value="good">Good (Paid)</option>
-                  <option value="pending">Pending</option>
-                  <option value="overdue">Overdue</option>
-                </select>
-              </div>
-              <div style={{display: 'flex', gap: 12}}>
-                <button type="button" className="btn" onClick={() => setShowEditModal(false)} style={{flex: 1}}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={saving} style={{flex: 1}}>
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+      {/* Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+        gap: 16
+      }}>
+        {units.map(unit => (
+          <div
+            key={unit.code}
+            style={{
+              background: unit.color,
+              color: 'white',
+              padding: 20,
+              borderRadius: 12,
+              textAlign: 'center',
+              minHeight: 100,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              cursor: unit.occupied ? 'pointer' : 'default',
+              transition: 'transform 0.2s',
+              opacity: unit.occupied ? 1 : 0.7
+            }}
+            onClick={() => unit.occupied && alert(`Unit ${unit.code}: ${unit.name}\nRent: KSh ${unit.rent}\nStatus: ${unit.statusLabel}\nDue: ${unit.daysUntilDue} days`)}
+          >
+            <h3 style={{margin: '0 0 4px 0', fontSize: 18, fontWeight: 700}}>{unit.code}</h3>
+            {unit.occupied ? (
+              <>
+                <p style={{margin: '4px 0 0 0', fontSize: 13, fontWeight: 500}}>{unit.name}</p>
+                <p style={{margin: '2px 0 0 0', fontSize: 12, opacity: 0.9}}>KSh {unit.rent.toLocaleString()}</p>
+                <span style={{
+                  marginTop: 6,
+                  padding: '2px 8px',
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: 12,
+                  fontSize: 10,
+                  fontWeight: 600
+                }}>
+                  {unit.statusLabel}
+                </span>
+              </>
+            ) : (
+              <p style={{margin: '4px 0 0 0', fontSize: 12, opacity: 0.8, textTransform: 'uppercase'}}>Vacant</p>
+            )}
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

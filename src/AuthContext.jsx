@@ -1,134 +1,135 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
-const AuthContext = createContext();
+const AuthContext = createContext({});
 
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then((response) => {
-      const currentSession = response.data.session;
-      setSession(currentSession);
-      if (currentSession) {
-        fetchProfile(currentSession.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const authListener = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.user.id);
+    checkSession();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchUserProfile(session.user);
       } else {
         setUserProfile(null);
         setLoading(false);
       }
     });
-
-    return () => {
-      authListener.data.subscription.unsubscribe();
-    };
+    
+    return () => subscription.unsubscribe();
   }, []);
 
-  async function fetchProfile(userId) {
-    console.log('🔍 Fetching profile for ID:', userId);
-    setLoading(true);
-
+  async function checkSession() {
     try {
-      // Get fresh session to access email
-      const sessionResponse = await supabase.auth.getSession();
-      const currentSession = sessionResponse.data.session;
-      const email = currentSession ? currentSession.user.email : null;
-
-      console.log('📧 Session email:', email);
-
-      if (!email) {
-        console.error('❌ No email found in session!');
-        setUserProfile({ id: userId, role: 'tenant', name: 'User' });
-        setLoading(false);
-        return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await fetchUserProfile(session.user);
       }
+    } catch (error) {
+      console.error('Session check error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      // 1. Check ADMINS table
-      const adminResponse = await supabase
+  async function fetchUserProfile(user) {
+    try {
+      console.log('Fetching profile for ID:', user.id);
+      
+      // Check Admins Table
+      const { data: admin, error: adminError } = await supabase
         .from('admins')
         .select('*')
-        .eq('id', userId)
+        .eq('id', user.id)
         .single();
 
-      const adminData = adminResponse.data;
-      const adminError = adminResponse.error;
-
-      if (adminError && adminError.code !== 'PGRST116') {
-        console.error('❌ Admin error:', adminError);
-      }
-
-      if (adminData) {
-        if (adminData.frozen) {
-          alert('❄️ Account Frozen!');
-          await supabase.auth.signOut();
-          return;
-        }
-        const role = adminData.is_supreme ? 'sa' : 'admin';
-        console.log('✅ ADMIN detected. Role:', role);
-        setUserProfile({ ...adminData, role });
-        setLoading(false);
+      if (admin) {
+        console.log('ADMIN detected. Role:', admin.role || 'admin', 'Frozen:', admin.frozen);
+        
+        setUserProfile({
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role || 'admin',
+          frozen: admin.frozen,
+          subscription_status: admin.subscription_status,
+          subscription_due: admin.subscription_due,
+          admin_id: admin.id
+        });
         return;
       }
 
-      // 2. Check TENANTS table
-      console.log('⚠️ Not admin. Checking tenant with email:', email);
-      
-      const tenantResponse = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('email', email)
-        .single();
-
-      const tenantData = tenantResponse.data;
-      const tenantError = tenantResponse.error;
-
-      if (tenantError && tenantError.code !== 'PGRST116') {
-        console.error('❌ Tenant error:', tenantError);
+      // Check for Special SA email
+      if (user.email === 'sa@domusea.com' || user.email === 'supremeadmin@domusea.com' || user.email === '4mreaper@gmail.com') {
+        console.log('SUPREME ADMIN detected');
+        setUserProfile({
+          id: user.id,
+          name: 'Supreme Admin',
+          email: user.email,
+          role: 'sa',
+          frozen: false
+        });
+        return;
       }
 
-      if (tenantData) {
-        console.log('✅ TENANT detected:', tenantData.name);
-        setUserProfile({ ...tenantData, role: 'tenant', id: userId });
-      } else {
-        console.log('⚠️ No tenant record. Default user.');
-        setUserProfile({ id: userId, role: 'tenant', name: 'User', email: email });
-      }
-    } catch (err) {
-      console.error('💥 Fetch error:', err);
+      // Default to Tenant
+      console.log('TENANT detected');
+      setUserProfile({
+        id: user.id,
+        name: user.email.split('@')[0],
+        email: user.email,
+        role: 'tenant',
+        frozen: false,
+        admin_id: null 
+      });
+
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setUserProfile(null);
     } finally {
       setLoading(false);
     }
   }
 
   async function login(email, password) {
-    const result = await supabase.auth.signInWithPassword({ email, password });
-    if (result.error) throw result.error;
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (authError) throw authError;
+      if (!user) throw new Error('Login failed');
+
+      await fetchUserProfile(user);
+
+      return user;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   }
 
   async function logout() {
-    await supabase.auth.signOut();
-    window.location.reload();
+    try {
+      await supabase.auth.signOut();
+      setUserProfile(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   }
 
-  return (
-    <AuthContext.Provider value={{ session, userProfile, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+  const value = {
+    userProfile,
+    loading,
+    login,
+    logout
+  };
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};

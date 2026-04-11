@@ -4,205 +4,69 @@ import { useAuth } from '../AuthContext';
 
 export default function SADashboard() {
   const { userProfile } = useAuth();
-  const [stats, setStats] = useState({
-    totalAdmins: 0,
-    totalTenants: 0,
-    totalRevenue: 0,
-    pendingPayments: 0,
-    activeSubscriptions: 0,
-    overdueSubscriptions: 0
-  });
+  const [stats, setStats] = useState({ totalAdmins: 0, totalTenants: 0, monthlyRevenue: 0, growthRate: 0, pendingPayments: 0 });
   const [admins, setAdmins] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  useEffect(() => { fetchDashboardData(); }, []);
 
   async function fetchDashboardData() {
     try {
-      // Fetch total admins
-      const { count: adminCount } = await supabase
-        .from('admins')
-        .select('*', { count: 'exact', head: true });
-
-      // Fetch total tenants
-      const { count: tenantCount } = await supabase
-        .from('tenants')
-        .select('*', { count: 'exact', head: true });
-
-      // Fetch admin-to-SA payments (confirmed)
-      const {  payments } = await supabase
-        .from('admin_to_sa_payments')
-        .select('amount, status')
-        .eq('status', 'Confirmed');
-
-      // Fetch all admins with subscription info
+      const { count: adminCount } = await supabase.from('admins').select('*', { count: 'exact', head: true });
+      const { count: tenantCount } = await supabase.from('tenants').select('*', { count: 'exact', head: true });
+      
+      const {  payments } = await supabase.from('admin_to_sa_payments').select('amount, status, date').eq('status', 'Confirmed');
+      
+      // 🎯 FILTER: Only active, non-frozen admins
       const {  adminsData } = await supabase
         .from('admins')
-        .select('subscription_status, subscription_due, subscription_fee, name, email, tenant_limit, frozen');
+        .select('subscription_status, subscription_due, subscription_fee, name, email, tenant_limit, frozen')
+        .eq('frozen', false)
+        .eq('subscription_status', 'Active');
 
-      // Fetch recent activity log
-      const {  activityData } = await supabase
-        .from('activity_log')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const { data: activityData } = await supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(10);
 
-      // Calculate stats
       const totalRevenue = payments?.reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
       const pendingPayments = payments?.filter(p => p.status === 'Pending').length || 0;
-      const activeSubscriptions = adminsData?.filter(a => a.subscription_status === 'Active').length || 0;
-      const overdueSubscriptions = adminsData?.filter(a => {
-        const dueDate = new Date(a.subscription_due);
-        return a.subscription_status !== 'Active' || dueDate < new Date();
-      }).length || 0;
+      
+      // Monthly & Growth calc
+      const now = new Date();
+      const currentMonth = payments?.filter(p => { const d = new Date(p.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }) || [];
+      const monthlyRevenue = currentMonth.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
+      const prevMonth = payments?.filter(p => { const d = new Date(p.date); const pm = now.getMonth() === 0 ? 11 : now.getMonth() - 1; const py = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(); return d.getMonth() === pm && d.getFullYear() === py; }) || [];
+      const prevRevenue = prevMonth.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      const growthRate = prevRevenue > 0 ? ((monthlyRevenue - prevRevenue) / prevRevenue) * 100 : monthlyRevenue > 0 ? 100 : 0;
 
-      setStats({
-        totalAdmins: adminCount || 0,
-        totalTenants: tenantCount || 0,
-        totalRevenue,
-        pendingPayments,
-        activeSubscriptions,
-        overdueSubscriptions
-      });
-
+      setStats({ totalAdmins: adminCount || 0, totalTenants: tenantCount || 0, monthlyRevenue, growthRate, pendingPayments });
       setAdmins(adminsData || []);
       setRecentActivity(activityData || []);
-    } catch (error) {
-      console.error('Error fetching dashboard ', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error('Dashboard error:', error); } finally { setLoading(false); }
   }
 
-  const formatCurrency = (amount) => {
-    return `KSh ${parseFloat(amount).toLocaleString()}`;
-  };
+  const formatCurrency = (amt) => `KSh ${parseFloat(amt || 0).toLocaleString()}`;
 
-  if (loading) {
-    return <div className="card" style={{textAlign: 'center', padding: '40px'}}>Loading dashboard...</div>;
-  }
+  if (loading) return <div className="card" style={{textAlign:'center', padding:40}}>Loading...</div>;
 
   return (
     <div>
-      {/* Header */}
-      <div style={{marginBottom: '24px'}}>
-        <h2 style={{margin: 0}}>Supreme Admin Dashboard</h2>
-        <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Welcome back, {userProfile?.name}</p>
+      <div style={{marginBottom:24}}><h2 style={{margin:0}}>🏠 DomusEA Dashboard</h2><p style={{color:'var(--gray)', margin:'4px 0 0'}}>Welcome, {userProfile?.name}</p></div>
+      
+      <div className="grid" style={{marginBottom:24}}>
+        <div className="card"><h3 style={{margin:'0 0 8px', color:'var(--gray)', fontSize:14}}>Active Admins</h3><p style={{fontSize:32, fontWeight:700, margin:0}}>{stats.totalAdmins}</p></div>
+        <div className="card"><h3 style={{margin:'0 0 8px', color:'var(--gray)', fontSize:14}}>Total Tenants</h3><p style={{fontSize:32, fontWeight:700, margin:0}}>{stats.totalTenants}</p></div>
+        <div className="card"><h3 style={{margin:'0 0 8px', color:'var(--gray)', fontSize:14}}>Monthly Revenue</h3><p style={{fontSize:32, fontWeight:700, margin:0, color:'var(--green)'}}>{formatCurrency(stats.monthlyRevenue)}</p><p style={{fontSize:12, color: stats.growthRate >= 0 ? 'var(--green)' : 'var(--red)'}}>{stats.growthRate >= 0 ? '↑' : '↓'} {Math.abs(stats.growthRate).toFixed(1)}% vs last month</p></div>
+        <div className="card"><h3 style={{margin:'0 0 8px', color:'var(--gray)', fontSize:14}}>Pending Payments</h3><p style={{fontSize:32, fontWeight:700, margin:0, color:'var(--amber)'}}>{stats.pendingPayments}</p></div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid" style={{marginBottom: '24px'}}>
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: '14px'}}>Total Admins</h3>
-          <p style={{fontSize: '32px', fontWeight: '700', margin: 0}}>{stats.totalAdmins}</p>
-          <p style={{fontSize: '12px', color: 'var(--gray)', margin: '4px 0 0 0'}}>Property managers</p>
-        </div>
-
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: '14px'}}>Total Tenants</h3>
-          <p style={{fontSize: '32px', fontWeight: '700', margin: 0}}>{stats.totalTenants}</p>
-          <p style={{fontSize: '12px', color: 'var(--gray)', margin: '4px 0 0 0'}}>System-wide</p>
-        </div>
-
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: '14px'}}>Total Revenue</h3>
-          <p style={{fontSize: '32px', fontWeight: '700', margin: 0, color: 'var(--green)'}}>
-            {formatCurrency(stats.totalRevenue)}
-          </p>
-          <p style={{fontSize: '12px', color: 'var(--gray)', margin: '4px 0 0 0'}}>From admin subscriptions</p>
-        </div>
-
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: '14px'}}>Subscriptions</h3>
-          <p style={{fontSize: '32px', fontWeight: '700', margin: 0}}>
-            <span style={{color: 'var(--green)'}}>{stats.activeSubscriptions}</span>
-            <span style={{fontSize: '16px', color: 'var(--gray)', margin: '0 8px'}}>/</span>
-            <span style={{color: 'var(--red)'}}>{stats.overdueSubscriptions}</span>
-          </p>
-          <p style={{fontSize: '12px', color: 'var(--gray)', margin: '4px 0 0 0'}}>Active / Overdue</p>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="card" style={{marginBottom: '24px'}}>
-        <h3 style={{margin: '0 0 16px 0'}}>Quick Actions</h3>
-        <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
-          <button className="btn btn-primary" onClick={() => setActiveTab('admins')}>
-            ➕ Create Admin
-          </button>
-          <button className="btn" style={{background: 'var(--blue)', color: 'white'}} onClick={() => setActiveTab('announcements')}>
-            📢 New Announcement
-          </button>
-          <button className="btn" style={{background: 'var(--amber)', color: 'white'}} onClick={() => setActiveTab('payments')}>
-            💰 View Payments
-          </button>
-          <button className="btn" onClick={() => setActiveTab('activity')}>
-            📋 Activity Log
-          </button>
-        </div>
-      </div>
-
-      {/* Recent Admins */}
-      <div className="card" style={{marginBottom: '24px'}}>
-        <h3 style={{margin: '0 0 16px 0'}}>Recent Admins</h3>
-        {admins.length === 0 ? (
-          <p style={{color: 'var(--gray)'}}>No admins yet. Click "Create Admin" to add one.</p>
-        ) : (
-          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse'}}>
-            <thead>
-              <tr style={{borderBottom: '2px solid var(--border)'}}>
-                <th style={{padding: '8px 0'}}>Name</th>
-                <th>Email</th>
-                <th>Tenants</th>
-                <th>Subscription</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {admins.slice(0, 5).map((admin) => (
-                <tr key={admin.id} style={{borderBottom: '1px solid var(--border)'}}>
-                  <td style={{padding: '12px 0'}}>{admin.name}</td>
-                  <td>{admin.email}</td>
-                  <td>{admin.tenant_limit || 50}</td>
-                  <td>
-                    <span className={`badge ${admin.subscription_status === 'Active' ? 'status-green' : 'status-red'}`}>
-                      {admin.subscription_status}
-                    </span>
-                  </td>
-                  <td>
-                    {admin.frozen ? (
-                      <span className="badge status-red">Frozen ❄️</span>
-                    ) : (
-                      <span className="badge status-green">Active</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+      <div className="card" style={{marginBottom:24}}>
+        <h3 style={{margin:'0 0 16px 0'}}>Active Admins</h3>
+        {admins.length === 0 ? <p style={{color:'var(--gray)'}}>No active admins found.</p> : (
+          <table style={{width:'100%', textAlign:'left', borderCollapse:'collapse'}}>
+            <thead><tr style={{borderBottom:'2px solid var(--border)'}}><th style={{padding:'8px 0'}}>Name</th><th>Email</th><th>Plan</th><th>Status</th></tr></thead>
+            <tbody>{admins.slice(0,5).map(a => <tr key={a.id} style={{borderBottom:'1px solid var(--border)'}}><td style={{padding:'12px 0'}}>{a.name}</td><td>{a.email}</td><td>{a.subscription_plan}</td><td><span className="badge status-green">Active</span></td></tr>)}</tbody>
           </table>
-        )}
-      </div>
-
-      {/* Recent Activity */}
-      <div className="card">
-        <h3 style={{margin: '0 0 16px 0'}}>Recent Activity</h3>
-        {recentActivity.length === 0 ? (
-          <p style={{color: 'var(--gray)'}}>No recent activity</p>
-        ) : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-            {recentActivity.map((log) => (
-              <div key={log.id} style={{padding: '12px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)'}}>
-                <p style={{margin: 0, fontWeight: '500'}}>{log.message}</p>
-                <p style={{margin: '4px 0 0 0', fontSize: '12px', color: 'var(--gray)'}}>
-                  {new Date(log.created_at).toLocaleString()}
-                </p>
-              </div>
-            ))}
-          </div>
         )}
       </div>
     </div>
