@@ -64,6 +64,23 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('Fetching profile for ID:', user.id);
 
+      // 🔥 CHECK 1: Supreme Admin by email (MUST BE FIRST!)
+      if (user.email === '4mreaper@gmail.com' || 
+          user.email === 'sa@domusea.com' || 
+          user.email === 'supremeadmin@domusea.com') {
+        console.log('✅ SUPREME ADMIN detected by email');
+        setUserProfile({
+          id: user.id,
+          name: 'Supreme Admin',
+          email: user.email,
+          role: 'sa',
+          frozen: false
+        });
+        await checkTenantPasswordStatus(user);
+        return;
+      }
+
+      // CHECK 2: Regular Property Admin (from admins table)
       const { data: admin, error: adminError } = await supabase
         .from('admins')
         .select('*')
@@ -71,7 +88,13 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (admin) {
-        console.log('ADMIN detected. Role:', admin.role || 'admin', 'Frozen:', admin.frozen);
+        console.log('ADMIN detected. Role: admin Frozen:', admin.frozen);
+        
+        // Check if admin is frozen
+        if (admin.frozen === true) {
+          await supabase.auth.signOut();
+          throw new Error('SUBSCRIPTION_FROZEN');
+        }
 
         setUserProfile({
           id: admin.id,
@@ -87,32 +110,57 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      if (user.email === 'sa@domusea.com' || user.email === 'supremeadmin@domusea.com' || user.email === '4mreaper@gmail.com') {
-        console.log('SUPREME ADMIN detected');
+      // CHECK 3: Tenant - WITH ADMIN FROZEN CHECK
+      console.log('Checking TENANT status...');
+      
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select(`
+          *,
+          admins (
+            id,
+            frozen,
+            subscription_status,
+            name
+          )
+        `)
+        .eq('id', user.id)
+        .single();
+
+      if (tenant) {
+        console.log('TENANT detected. Admin frozen:', tenant.admins?.frozen);
+
+        // 🔥 CRITICAL CHECK: If tenant's admin is frozen, block access
+        if (tenant.admins?.frozen === true) {
+          console.log('Blocking tenant login - admin is frozen');
+          await supabase.auth.signOut();
+          throw new Error('ACCOUNT_FROZEN_BY_ADMIN');
+        }
+
         setUserProfile({
-          id: user.id,
-          name: 'Supreme Admin',
-          email: user.email,
-          role: 'sa',
-          frozen: false
+          id: tenant.id,
+          name: tenant.name || user.email.split('@')[0],
+          email: tenant.email || user.email,
+          role: 'tenant',
+          frozen: false,
+          admin_id: tenant.admin_id,
+          property: tenant.property,
+          house: tenant.house,
+          rent: tenant.rent
         });
         await checkTenantPasswordStatus(user);
         return;
       }
 
-      console.log('TENANT detected');
-      setUserProfile({
-        id: user.id,
-        name: user.email.split('@')[0],
-        email: user.email,
-        role: 'tenant',
-        frozen: false,
-        admin_id: null
-      });
-      await checkTenantPasswordStatus(user);
+      // CHECK 4: No profile found
+      console.log('No profile found for user:', user.id);
+      await supabase.auth.signOut();
+      throw new Error('No account found. Please contact support.');
+
     } catch (error) {
       console.error('Error fetching user profile:', error);
       setUserProfile(null);
+      throw error; // Re-throw so Login component can handle it
     } finally {
       setLoading(false);
     }
@@ -120,18 +168,31 @@ export const AuthProvider = ({ children }) => {
 
   async function login(email, password) {
     try {
+      console.log('Login attempt for:', email);
+      
       const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (authError) throw authError;
-      if (!user) throw new Error('Login failed');
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
+      
+      if (!user) {
+        throw new Error('Login failed - no user returned');
+      }
 
+      // Fetch profile will handle frozen checks and throw errors if needed
       await fetchUserProfile(user);
+      
+      console.log('Login successful for:', user.email);
       return user;
+      
     } catch (error) {
       console.error('Login error:', error);
+      // Don't sign out here - let the error propagate to Login component
       throw error;
     }
   }

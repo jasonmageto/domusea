@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
+
+// Existing Components
 import SADashboard from './components/SADashboard';
 import ManageAdmins from './components/ManageAdmins';
 import PropertyAdminDashboard from './components/PropertyAdminDashboard';
@@ -20,7 +22,13 @@ import SAAnnouncements from './components/SAAnnouncements';
 import SARevenueAnalytics from './components/SARevenueAnalytics';
 import AdminRevenueAnalytics from './components/AdminRevenueAnalytics';
 
-// --- LOGIN SCREEN ---
+// Map & Property Components
+import PropertySearch from './components/PropertySearch';
+import PropertyMap from './components/PropertyMap';
+import AddPropertyForm from './components/AddPropertyForm';
+import PropertyModeration from './components/PropertyModeration';
+
+// --- LOGIN SCREEN WITH FROZEN HANDLING ---
 const LoginScreen = () => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -28,19 +36,176 @@ const LoginScreen = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await login(email, password);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+ const handleLogin = async (e) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
+  try {
+    await login(email, password);
+  } catch (err) {
+    console.error('Login error:', err.message);
+    // Check for frozen account errors using .includes()
+    if (err.message && err.message.includes('ACCOUNT_FROZEN_BY_ADMIN')) {
+      setError('FROZEN_TENANT');
+    } else if (err.message && err.message.includes('SUBSCRIPTION_FROZEN')) {
+      setError('FROZEN_ADMIN');
+    } else {
+      setError(err.message || 'Failed to sign in');
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
+  // 🔥 FROZEN TENANT SCREEN
+  if (error === 'FROZEN_TENANT') {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f3f4f6',
+        padding: 20
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: 12,
+          padding: 40,
+          maxWidth: 450,
+          width: '100%',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>⏳</div>
+          <h2 style={{ margin: '0 0 16px 0', color: '#1f2937' }}>
+            Account Temporarily Unavailable
+          </h2>
+          <p style={{ margin: '0 0 24px 0', color: '#6b7280', lineHeight: 1.6 }}>
+            Your property manager's account is currently inactive due to a maintenance issue.
+          </p>
+          <div style={{
+            padding: 16,
+            background: '#fef3c7',
+            borderRadius: 8,
+            marginBottom: 24,
+            textAlign: 'left'
+          }}>
+            <strong style={{ color: '#92400e' }}>What to do:</strong>
+            <ul style={{ margin: '8px 0 0 0', paddingLeft: 20, color: '#92400e', lineHeight: 1.8 }}>
+              <li>Contact your Manager</li>
+              <li>They need to renew their subscription</li>
+              <li>You'll regain access immediately after. Kindly be patient.</li>
+            </ul>
+          </div>
+          <button
+            onClick={() => {
+              setError('');
+              setEmail('');
+              setPassword('');
+              window.location.reload();
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#111827',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 🔥 FROZEN ADMIN SCREEN
+  if (error === 'FROZEN_ADMIN') {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f3f4f6',
+        padding: 20
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: 12,
+          padding: 40,
+          maxWidth: 450,
+          width: '100%',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+          <h2 style={{ margin: '0 0 16px 0', color: '#dc2626' }}>
+            Subscription Expired
+          </h2>
+          <p style={{ margin: '0 0 24px 0', color: '#6b7280' }}>
+            Your account has been frozen due to an overdue subscription.
+          </p>
+          <div style={{
+            padding: 16,
+            background: '#fee2e2',
+            borderRadius: 8,
+            marginBottom: 24
+          }}>
+            <strong style={{ color: '#991b1b' }}>Contact to Renew:</strong><br/>
+            <span style={{ color: '#991b1b' }}>
+              📞 0711 333 436<br/>
+              📧 sa@domusea.com
+            </span>
+          </div>
+          <button
+            onClick={() => window.location.href = 'tel:0711333436'}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 12
+            }}
+          >
+            📞 Call Now
+          </button>
+          <button
+            onClick={() => {
+              setError('');
+              setEmail('');
+              setPassword('');
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#f3f4f6',
+              color: '#374151',
+              border: '2px solid #d1d5db',
+              borderRadius: 6,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ DEFAULT LOGIN FORM
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', fontFamily: "'Inter', sans-serif", background: '#fff' }}>
       <div className="login-left" style={{
@@ -69,7 +234,7 @@ const LoginScreen = () => {
           </div>
 
           <form onSubmit={handleLogin}>
-            {error && (
+            {error && error !== 'FROZEN_TENANT' && error !== 'FROZEN_ADMIN' && (
               <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
                 ⚠️ {error}
               </div>
@@ -113,10 +278,8 @@ const LoginScreen = () => {
   );
 };
 
-// --- SUBSCRIPTION EXPIRED PAGE (For Frozen Admins) ---
-const SubscriptionExpired = () => {
-  const { userProfile, logout } = useAuth();
-
+// --- SUBSCRIPTION EXPIRED PAGE ---
+const SubscriptionExpired = ({ userProfile, logout }) => {
   return (
     <div style={{
       minHeight: '100vh',
@@ -148,16 +311,13 @@ const SubscriptionExpired = () => {
         }}>
           ⚠️
         </div>
-
         <h1 style={{ margin: '0 0 16px 0', color: '#111', fontSize: 28 }}>
           Subscription Expired
         </h1>
-
         <p style={{ color: '#666', fontSize: 16, lineHeight: 1.6, marginBottom: 24 }}>
           Your DomusEA admin account has been frozen due to an overdue subscription. 
           To restore access to your property management dashboard, please renew your subscription.
         </p>
-
         <div style={{
           background: '#f3f4f6',
           borderRadius: 12,
@@ -169,12 +329,8 @@ const SubscriptionExpired = () => {
             📋 Account Details
           </h3>
           <div style={{ fontSize: 14, color: '#374151' }}>
-            <p style={{ margin: '8px 0' }}>
-              <strong>Name:</strong> {userProfile?.name}
-            </p>
-            <p style={{ margin: '8px 0' }}>
-              <strong>Email:</strong> {userProfile?.email}
-            </p>
+            <p style={{ margin: '8px 0' }}><strong>Name:</strong> {userProfile?.name}</p>
+            <p style={{ margin: '8px 0' }}><strong>Email:</strong> {userProfile?.email}</p>
             <p style={{ margin: '8px 0' }}>
               <strong>Subscription Due:</strong>{' '}
               {userProfile?.subscription_due 
@@ -184,7 +340,6 @@ const SubscriptionExpired = () => {
             </p>
           </div>
         </div>
-
         <div style={{
           background: '#eff6ff',
           border: '2px solid #3b82f6',
@@ -196,76 +351,19 @@ const SubscriptionExpired = () => {
             📞 Contact to Renew
           </h3>
           <p style={{ margin: '0 0 12px 0', color: '#1e40af', fontSize: 14 }}>
-            Reach out to the The Administrator to renew your subscription:
+            Reach out to the Administrator to renew your subscription:
           </p>
           <div style={{ fontSize: 14, color: '#1e40af' }}>
-            <p style={{ margin: '8px 0', fontWeight: 600 }}>
-              📱 Phone: 0711 333 436
-            </p>
-            <p style={{ margin: '8px 0' }}>
-              📧 Email: sa@domusea.com
-            </p>
+            <p style={{ margin: '8px 0', fontWeight: 600 }}>📱 Phone: 0711 333 436</p>
+            <p style={{ margin: '8px 0' }}>📧 Email: sa@domusea.com</p>
           </div>
         </div>
-
-        <div style={{
-          display: 'flex',
-          gap: 12,
-          justifyContent: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <button
-            onClick={logout}
-            style={{
-              padding: '12px 24px',
-              background: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Logout
-          </button>
-          <button
-            onClick={() => window.location.href = 'tel:0711333436'}
-            style={{
-              padding: '12px 24px',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            📞 Call Now
-          </button>
-          <button
-            onClick={() => window.location.href = 'mailto:sa@domusea.com?subject=Subscription Renewal Request'}
-            style={{
-              padding: '12px 24px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            📧 Email
-          </button>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button onClick={logout} style={{ padding: '12px 24px', background: '#6b7280', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Logout</button>
+          <button onClick={() => window.location.href = 'tel:0711333436'} style={{ padding: '12px 24px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>📞 Call Now</button>
+          <button onClick={() => window.location.href = 'mailto:sa@domusea.com?subject=Subscription Renewal Request'} style={{ padding: '12px 24px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>📧 Email</button>
         </div>
-
-        <p style={{
-          margin: '24px 0 0 0',
-          fontSize: 12,
-          color: '#9ca3af'
-        }}>
+        <p style={{ margin: '24px 0 0 0', fontSize: 12, color: '#9ca3af' }}>
           Once your subscription is renewed, you'll regain full access to your dashboard.
         </p>
       </div>
@@ -273,15 +371,13 @@ const SubscriptionExpired = () => {
   );
 };
 
-// --- SIDEBAR WITH USER PROFILE ---
+// --- SIDEBAR ---
 const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role, user }) => {
   if (!role) return null;
   
   return (
     <div className="sidebar">
       <h3 style={{marginBottom: 16}}>🏠 DomusEA</h3>
-
-      {/* User Profile Card */}
       <div style={{ 
         padding: '12px', 
         background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', 
@@ -320,10 +416,11 @@ const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role, user }) => 
         )}
       </div>
       
-      {/* Supreme Admin Navigation */}
       {role === 'sa' && (
         <>
           <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
+          <button className={`nav-btn ${active==='moderation'?'active':''}`} onClick={()=>onNav('moderation')}>🛡️ Property Moderation</button>
+          <button className={`nav-btn ${active==='map'?'active':''}`} onClick={()=>onNav('map')}>🗺️ All Properties Map</button>
           <button className={`nav-btn ${active==='admins'?'active':''}`} onClick={()=>onNav('admins')}>Manage Admins</button>
           <button className={`nav-btn ${active==='subscriptions'?'active':''}`} onClick={()=>onNav('subscriptions')}>Subscriptions</button>
           <button className={`nav-btn ${active==='revenue'?'active':''}`} onClick={()=>onNav('revenue')}>Revenue Analytics</button>
@@ -333,12 +430,13 @@ const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role, user }) => 
         </>
       )}
       
-      {/* Property Admin Navigation */}
       {role === 'admin' && (
         <>
           <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
+          <button className={`nav-btn ${active==='map'?'active':''}`} onClick={()=>onNav('map')}>🗺️ Property Map</button>
+          <button className={`nav-btn ${active==='occupancy'?'active':''}`} onClick={()=>onNav('occupancy')}>📊 Occupancy & Vacancies</button>
           <button className={`nav-btn ${active==='tenants'?'active':''}`} onClick={()=>onNav('tenants')}>Manage Tenants</button>
-          <button className={`nav-btn ${active==='occupancy'?'active':''}`} onClick={()=>onNav('occupancy')}>Occupancy Grid</button>
+          <button className={`nav-btn ${active==='add-property'?'active':''}`} onClick={()=>onNav('add-property')}>➕ Add Property</button>
           <button className={`nav-btn ${active==='payment-methods'?'active':''}`} onClick={()=>onNav('payment-methods')}>Payment Methods</button>
           <button className={`nav-btn ${active==='payments'?'active':''}`} onClick={()=>onNav('payments')}>Payments</button>
           <button className={`nav-btn ${active==='revenue'?'active':''}`} onClick={()=>onNav('revenue')}>Revenue Analytics</button>
@@ -347,10 +445,10 @@ const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role, user }) => 
         </>
       )}
 
-      {/* Tenant Navigation */}
       {role === 'tenant' && (
         <>
           <button className={`nav-btn ${active==='dashboard'?'active':''}`} onClick={()=>onNav('dashboard')}>Dashboard</button>
+          <button className={`nav-btn ${active==='search'?'active':''}`} onClick={()=>onNav('search')}>🗺️ Find Properties</button>
           <button className={`nav-btn ${active==='pay'?'active':''}`} onClick={()=>onNav('pay')}>Pay Rent</button>
           <button className={`nav-btn ${active==='history'?'active':''}`} onClick={()=>onNav('history')}>Payment History</button>
           <button className={`nav-btn ${active==='requests'?'active':''}`} onClick={()=>onNav('requests')}>My Requests</button>
@@ -373,16 +471,18 @@ const Sidebar = ({ active, onNav, isDark, toggleTheme, logout, role, user }) => 
 // --- DASHBOARD CONTENT ROUTER ---
 const DashboardContent = ({ activePage, role, userProfile }) => {
   if (!role) return <div className="card" style={{textAlign:'center', padding:40}}>Loading...</div>;
-
   if (activePage === 'messages') return <Messages userProfile={userProfile} />;
+  if (activePage === 'search' || activePage === 'map') return <PropertySearch />;
 
   if (role === 'sa') {
     switch (activePage) {
+      case 'moderation': return <PropertyModeration />;
       case 'admins': return <ManageAdmins />;
       case 'subscriptions': return <SASubscriptions />;
       case 'revenue': return <SARevenueAnalytics />;
       case 'payments': return <SAPayments />;
       case 'announcements': return <SAAnnouncements />;
+      case 'map': return <PropertyMap enableRealtime={true} />;
       default: return <SADashboard />;
     }
   }
@@ -391,10 +491,12 @@ const DashboardContent = ({ activePage, role, userProfile }) => {
     switch (activePage) {
       case 'tenants': return <ManageTenants />;
       case 'occupancy': return <OccupancyGrid />;
+      case 'add-property': return <AddPropertyForm onBack={() => onNav('dashboard')} />;
       case 'payment-methods': return <AdminPaymentMethods />;
       case 'payments': return <AdminPaymentsManager />;
       case 'revenue': return <AdminRevenueAnalytics />;
       case 'complaints': return <ComplaintsManager />;
+      case 'map': return <PropertyMap enableRealtime={true} />;
       default: return <PropertyAdminDashboard />;
     }
   }
@@ -402,6 +504,7 @@ const DashboardContent = ({ activePage, role, userProfile }) => {
   if (role === 'tenant') {
     switch (activePage) {
       case 'dashboard': return <TenantDashboard />;
+      case 'search': return <PropertySearch />;
       case 'pay': return <TenantPayRent />;
       case 'history': return <TenantPaymentHistory />;
       case 'requests': return <TenantRequests />;
@@ -409,7 +512,6 @@ const DashboardContent = ({ activePage, role, userProfile }) => {
       default: return <TenantDashboard />;
     }
   }
-
   return <div className="card"><h2>Welcome</h2><p>Role: {role}</p></div>;
 };
 
@@ -419,7 +521,6 @@ const AppContent = () => {
   const [isDark, setIsDark] = useState(false);
   const [activePage, setActivePage] = useState('dashboard');
 
-  // Theme toggle effect
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
@@ -440,12 +541,12 @@ const AppContent = () => {
     }
   };
 
-  // Show login screen if not authenticated
+  // Show login if no user
   if (!userProfile) {
     return <LoginScreen />;
   }
 
-  // ✅ CHECK IF FROZEN - Render subscription expired page
+  // Show frozen screen if admin is frozen
   if (userProfile.role === 'admin' && userProfile.frozen) {
     return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
   }
