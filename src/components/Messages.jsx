@@ -25,6 +25,12 @@ export default function Messages() {
   }, [userProfile?.id]);
 
   useEffect(() => {
+    if (showNewMessageModal) {
+      loadRecipients();
+    }
+  }, [showNewMessageModal]);
+
+  useEffect(() => {
     if (selectedConversation) {
       loadMessagesForConversation();
     }
@@ -50,7 +56,6 @@ export default function Messages() {
 
       if (error) throw error;
 
-      // Group by other user ID
       const conversationMap = new Map();
       
       data?.forEach(msg => {
@@ -78,7 +83,6 @@ export default function Messages() {
         }
       });
 
-      // Convert to array and sort by date
       const conversationsArray = Array.from(conversationMap.values()).sort((a, b) => 
         new Date(b.lastMessage.date) - new Date(a.lastMessage.date)
       );
@@ -107,7 +111,6 @@ export default function Messages() {
 
       if (error) throw error;
 
-      // Mark as read
       const unreadMessages = data?.filter(m => m.to_id === userProfile.id && !m.read) || [];
       if (unreadMessages.length > 0) {
         await Promise.all(
@@ -125,50 +128,91 @@ export default function Messages() {
 
   const loadRecipients = async () => {
     try {
-      let filteredAdmins = [];
+      console.log('🔄 Loading recipients for role:', userProfile?.role, 'User ID:', userProfile?.id);
       
-      if (userProfile.role === 'sa') {
-        const {  allAdmins } = await supabase
+      let filteredAdmins = [];
+      let filteredTenants = [];
+      
+      if (userProfile?.role === 'sa') {
+        console.log('📡 SA fetching all admins...');
+        
+        const {  allAdmins, error: adminsError } = await supabase
           .from('admins')
-          .select('id, name, email')
-          .neq('id', userProfile.id);
-        filteredAdmins = allAdmins || [];
-      } else if (userProfile.role === 'admin') {
-        const {  selfAdmin } = await supabase
+          .select('id, name, email');
+        
+        if (adminsError) {
+          console.error('❌ Admins fetch error:', adminsError);
+          toast.error('Failed to load admins: ' + adminsError.message);
+        } else {
+          console.log('✅ Raw admins response:', allAdmins);
+          filteredAdmins = (allAdmins || []).filter(a => a.id !== userProfile.id);
+          console.log('✅ SA found admins (excluding self):', filteredAdmins.length, filteredAdmins);
+        }
+        
+        console.log('📡 SA fetching all tenants...');
+        const {  allTenants, error: tenantsError } = await supabase
+          .from('tenants')
+          .select('id, name, email, house, property');
+        
+        if (tenantsError) {
+          console.error('❌ Tenants fetch error:', tenantsError);
+        } else {
+          console.log('✅ SA found tenants:', allTenants?.length || 0);
+          filteredTenants = allTenants || [];
+        }
+        
+      } else if (userProfile?.role === 'admin') {
+        console.log('📡 Admin fetching self...');
+        const {  selfAdmin, error } = await supabase
           .from('admins')
           .select('id, name, email')
           .eq('id', userProfile.id)
           .single();
-        filteredAdmins = selfAdmin ? [selfAdmin] : [];
-      } else if (userProfile.role === 'tenant') {
-        const {  adminData } = await supabase
+        
+        if (error) {
+          console.error('❌ Error fetching self:', error);
+        } else {
+          console.log('✅ Admin found self:', selfAdmin);
+          filteredAdmins = selfAdmin ? [selfAdmin] : [];
+        }
+        
+        console.log('📡 Admin fetching tenants...');
+        const {  myTenants, error: tErr } = await supabase
+          .from('tenants')
+          .select('id, name, email, house, property')
+          .eq('admin_id', userProfile.id);
+        
+        if (tErr) {
+          console.error('❌ Error fetching tenants:', tErr);
+        } else {
+          console.log('✅ Admin found tenants:', myTenants?.length || 0);
+          filteredTenants = myTenants || [];
+        }
+        
+      } else if (userProfile?.role === 'tenant') {
+        console.log('📡 Tenant fetching admin...');
+        const {  adminData, error } = await supabase
           .from('admins')
           .select('id, name, email')
           .eq('id', userProfile.admin_id)
           .single();
-        filteredAdmins = adminData ? [adminData] : [];
+        
+        if (error) {
+          console.error('❌ Error fetching admin:', error);
+        } else {
+          console.log('✅ Tenant found admin:', adminData);
+          filteredAdmins = adminData ? [adminData] : [];
+        }
       }
       
+      console.log('📋 Setting state - Admins:', filteredAdmins.length, 'Tenants:', filteredTenants.length);
       setAdmins(filteredAdmins);
-
-      let filteredTenants = [];
-      
-      if (userProfile.role === 'sa') {
-        const {  allTenants } = await supabase
-          .from('tenants')
-          .select('id, name, email, house, property');
-        filteredTenants = allTenants || [];
-      } else if (userProfile.role === 'admin') {
-        const {  myTenants } = await supabase
-          .from('tenants')
-          .select('id, name, email, house, property')
-          .eq('admin_id', userProfile.id);
-        filteredTenants = myTenants || [];
-      }
-      
       setTenants(filteredTenants);
+      
     } catch (err) {
-      console.error('❌ Error loading recipients:', err);
+      console.error('❌ loadRecipients error:', err);
+      console.error('Error stack:', err.stack);
+      toast.error('Failed to load recipients: ' + err.message);
     }
   };
 
@@ -240,7 +284,6 @@ export default function Messages() {
         borderRadius: 12,
         overflow: 'hidden'
       }}>
-        {/* Header */}
         <div style={{
           padding: '16px 20px',
           background: isDarkMode ? '#1e293b' : 'white',
@@ -286,7 +329,6 @@ export default function Messages() {
           </div>
         </div>
 
-        {/* Messages */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
@@ -358,7 +400,6 @@ export default function Messages() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
         <div style={{
           padding: '16px 20px',
           background: isDarkMode ? '#1e293b' : 'white',
@@ -434,7 +475,6 @@ export default function Messages() {
       margin: '0 auto',
       padding: 20
     }}>
-      {/* Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -466,7 +506,6 @@ export default function Messages() {
         </button>
       </div>
 
-      {/* Conversations List */}
       <div style={{
         background: isDarkMode ? '#1e293b' : 'white',
         borderRadius: 12,
@@ -620,7 +659,75 @@ export default function Messages() {
               </button>
             </div>
 
-            {!recipientType && (
+            {/* 🔧 Debug Panel */}
+            <div style={{ padding: 20, background: '#fee2e2', borderRadius: 8, marginBottom: 20 }}>
+              <h4 style={{ margin: '0 0 12px 0', color: '#dc2626' }}>🐛 Debug Mode</h4>
+              <div style={{ marginBottom: 8 }}>
+                <strong>User Profile:</strong>
+                <pre style={{ 
+                  background: 'white', 
+                  padding: 8, 
+                  borderRadius: 4, 
+                  fontSize: 12,
+                  overflow: 'auto',
+                  maxHeight: 150
+                }}>
+                  {JSON.stringify(userProfile, null, 2)}
+                </pre>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <strong>Current State - Admins:</strong> {admins.length}, <strong>Tenants:</strong> {tenants.length}
+              </div>
+              <button 
+                onClick={async () => {
+  console.log('🧪 Manual test query...');
+  const {  testAdmins, error } = await supabase
+    .from('admins')
+    .select('*');
+  console.log('✅ Test result:', testAdmins, 'Error:', error);
+  
+  if (error) {
+    alert(`Error: ${error.message}\nDetails: ${error.details || 'none'}`);
+  } else {
+    alert(`Found ${testAdmins?.length || 0} admins\nData: ${JSON.stringify(testAdmins, null, 2)}`);
+  }
+}}
+                style={{
+                  padding: '8px 16px',
+                  background: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginRight: 8
+                }}
+              >
+                Test Query
+              </button>
+              <button 
+                onClick={loadRecipients}
+                style={{
+                  padding: '8px 16px',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer'
+                }}
+              >
+                Retry Load
+              </button>
+            </div>
+
+            {!recipientType && admins.length === 0 && tenants.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 40, color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+                <div>Loading recipients...</div>
+                <div style={{ fontSize: 12, marginTop: 8 }}>Check console for details</div>
+              </div>
+            )}
+
+            {!recipientType && (admins.length > 0 || tenants.length > 0) && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {userProfile.role === 'sa' && admins.length > 0 && (
                   <button

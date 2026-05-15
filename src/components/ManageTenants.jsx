@@ -15,7 +15,7 @@ export default function ManageTenants() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newTenantCredentials, setNewTenantCredentials] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'vacated'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active'
   
   const [formData, setFormData] = useState({
     name: '',
@@ -37,11 +37,9 @@ export default function ManageTenants() {
   useEffect(() => {
     let result = [...tenants];
     
-    // Apply status filter first
+    // Apply status filter
     if (statusFilter === 'active') {
       result = result.filter(t => t.status?.toLowerCase() !== 'vacated');
-    } else if (statusFilter === 'vacated') {
-      result = result.filter(t => t.status?.toLowerCase() === 'vacated');
     }
     
     // Then apply search filter
@@ -239,20 +237,67 @@ export default function ManageTenants() {
     }
   };
 
+  // 🔧 UPDATED: Permanently delete tenant instead of marking as vacated
   const handleVacate = async (tenant) => {
-    if (!window.confirm(`Mark ${tenant.name} as vacated?`)) return;
+    const confirmed = window.confirm(
+      `⚠️ WARNING: PERMANENTLY REMOVE TENANT\n\n` +
+      `Name: ${tenant.name}\n` +
+      `Email: ${tenant.email}\n` +
+      `Property: ${tenant.property} - Unit ${tenant.house}\n\n` +
+      `This will:\n` +
+      `• Delete the tenant from the system\n` +
+      `• Remove all related data\n` +
+      `• CANNOT be undone\n\n` +
+      `Are you sure you want to proceed?`
+    );
+
+    if (!confirmed) return;
+
     try {
+      setLoading(true);
+      
+      // Delete related records first (cascade delete)
+      const relatedTables = [
+        'payments',
+        'complaints',
+        'maintenance_requests'
+      ];
+
+      for (const table of relatedTables) {
+        await supabase
+          .from(table)
+          .delete()
+          .eq('tenant_id', tenant.id);
+      }
+
+      // Delete messages where tenant is involved
+      await supabase
+        .from('messages')
+        .delete()
+        .or(`to_id.eq.${tenant.id},from_id.eq.${tenant.id}`);
+
+      // Delete tenant auth account
+      const { error: authError } = await supabase.auth.admin.deleteUser(tenant.id);
+      if (authError) {
+        console.warn('Warning: Could not delete auth account:', authError.message);
+      }
+
+      // Finally delete tenant record
       const { error } = await supabase
         .from('tenants')
-        .update({ status: 'Vacated' })
+        .delete()
         .eq('id', tenant.id)
         .eq('admin_id', userProfile.id);
+
       if (error) throw error;
+
+      alert(`✅ ${tenant.name} has been permanently removed from the system`);
       await fetchTenants();
-      alert('✅ Tenant marked as vacated');
     } catch (error) {
-      console.error('Error vacating tenant:', error);
-      alert('Failed to update tenant status.');
+      console.error('Error deleting tenant:', error);
+      alert(`❌ Failed to remove tenant: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -271,14 +316,12 @@ export default function ManageTenants() {
       case 'active': case 'paid': return 'status-green';
       case 'pending': return 'status-amber';
       case 'overdue': return 'status-red';
-      case 'vacated': return 'status-gray';
       default: return 'status-gray';
     }
   };
 
-  // Count stats
+  // Count stats - removed vacated count since tenants are deleted
   const activeCount = tenants.filter(t => t.status?.toLowerCase() !== 'vacated').length;
-  const vacatedCount = tenants.filter(t => t.status?.toLowerCase() === 'vacated').length;
 
   if (loading) {
     return (
@@ -338,7 +381,7 @@ export default function ManageTenants() {
           )}
         </div>
 
-        {/* Status Filter Tabs */}
+        {/* Status Filter Tabs - Removed Vacated tab */}
         <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
           <button
             onClick={() => setStatusFilter('all')}
@@ -357,17 +400,6 @@ export default function ManageTenants() {
             }}
           >
             ✅ Active ({activeCount})
-          </button>
-          <button
-            onClick={() => setStatusFilter('vacated')}
-            className={`btn ${statusFilter === 'vacated' ? 'btn-primary' : ''}`}
-            style={{
-              padding: '8px 16px',
-              background: statusFilter === 'vacated' ? 'var(--gray)' : undefined,
-              color: statusFilter === 'vacated' ? 'white' : undefined
-            }}
-          >
-            🏠 Vacated ({vacatedCount})
           </button>
         </div>
 
@@ -395,7 +427,6 @@ export default function ManageTenants() {
             </thead>
             <tbody>
               {filteredTenants.map((tenant) => {
-                const isVacated = tenant.status?.toLowerCase() === 'vacated';
                 const isMatch = searchTerm && (
                   tenant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   tenant.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -404,7 +435,6 @@ export default function ManageTenants() {
                 return (
                   <tr key={tenant.id} style={{
                     borderBottom: '1px solid var(--border)',
-                    opacity: isVacated ? 0.5 : 1,
                     background: isMatch ? 'rgba(59, 130, 246, 0.05)' : 'transparent'
                   }}>
                     <td style={{padding: '12px 8px', fontWeight: 600}}>{tenant.name}</td>
@@ -417,14 +447,14 @@ export default function ManageTenants() {
                       <span className={`badge ${getStatusColor(tenant.status)}`}>{tenant.status || 'Unknown'}</span>
                     </td>
                     <td style={{padding: '12px 8px'}}>
-                      {isVacated ? (
-                        <span style={{color: 'var(--gray)', fontSize: 13}}>📁 Archived</span>
-                      ) : (
-                        <>
-                          <button onClick={() => openEditModal(tenant)} className="btn btn-sm" style={{marginRight: 8}}>✏️ Edit</button>
-                          <button onClick={() => handleVacate(tenant)} className="btn btn-sm" style={{background: '#fee2e2', color: '#dc2626'}}>🏠 Vacate</button>
-                        </>
-                      )}
+                      <button onClick={() => openEditModal(tenant)} className="btn btn-sm" style={{marginRight: 8}}>✏️ Edit</button>
+                      <button 
+                        onClick={() => handleVacate(tenant)} 
+                        className="btn btn-sm" 
+                        style={{background: '#fee2e2', color: '#dc2626'}}
+                      >
+                        🗑️ Remove
+                      </button>
                     </td>
                   </tr>
                 );
@@ -433,16 +463,14 @@ export default function ManageTenants() {
                 <tr>
                   <td colSpan="8" style={{padding: 40, textAlign: 'center', color: 'var(--gray)'}}>
                     <div style={{fontSize: 32, marginBottom: 8}}>
-                      {statusFilter === 'vacated' ? '🏠' : searchTerm ? '🔍' : '👥'}
+                      {searchTerm ? '🔍' : '👥'}
                     </div>
                     <div>
                       {searchTerm 
                         ? `No tenants found matching "${searchTerm}"`
-                        : statusFilter === 'vacated'
-                          ? 'No vacated tenants found'
-                          : 'No active tenants found'}
+                        : 'No active tenants found'}
                     </div>
-                    {(searchTerm || statusFilter !== 'all') && (
+                    {searchTerm && (
                       <button onClick={() => {setSearchTerm(''); setStatusFilter('all');}} className="btn btn-sm" style={{marginTop: 12}}>
                         Clear Filters
                       </button>

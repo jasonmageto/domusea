@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../supabaseClient';
@@ -15,9 +15,34 @@ const DefaultIcon = L.icon({
   popupAnchor: [1, -34]
 });
 
+// 🔥 Component to handle map clicks
+function MapClickHandler({ onLocationSelect }) {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      onLocationSelect(lat, lng);
+    },
+  });
+  return null;
+}
+
+// 🔥 Reverse geocode to get address from coordinates
+async function reverseGeocode(lat, lng) {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+    );
+    const data = await response.json();
+    return data.display_name || null;
+  } catch (error) {
+    console.error('Reverse geocode error:', error);
+    return null;
+  }
+}
+
 export default function AddPropertyForm({ onBack }) {
   const { userProfile } = useAuth();
-  const [step, setStep] = useState(1); // 1: Details, 2: Location, 3: Review
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -149,6 +174,51 @@ export default function AddPropertyForm({ onBack }) {
     );
   };
 
+  // 🔥 Handle location selection from map click
+  const handleMapLocationSelect = async (lat, lng) => {
+    setLocation({ lat, lng });
+    setFormData({
+      ...formData,
+      latitude: lat.toString(),
+      longitude: lng.toString()
+    });
+    setAddressVerified(true);
+    
+    // Auto-get address from coordinates
+    const address = await reverseGeocode(lat, lng);
+    if (address) {
+      setFormData(prev => ({
+        ...prev,
+        address: address.split(',')[0],
+        city: address.split(',')[1]?.trim() || ''
+      }));
+    }
+    
+    toast.success('Location selected! You can refine by clicking again.');
+  };
+
+  // 🔥 Quick location presets for Kenya
+  const quickLocations = [
+    { name: 'Nairobi', lat: -1.286389, lng: 36.817223 },
+    { name: 'Kilifi', lat: -3.630278, lng: 39.850000 },
+    { name: 'Mombasa', lat: -4.043477, lng: 39.668206 },
+    { name: 'Kisumu', lat: -0.091702, lng: 34.767956 },
+    { name: 'Nakuru', lat: -0.303099, lng: 36.080025 },
+    { name: 'Eldoret', lat: 0.514277, lng: 35.269779 },
+  ];
+
+  const handleQuickLocation = (loc) => {
+    setLocation({ lat: loc.lat, lng: loc.lng });
+    setFormData({
+      ...formData,
+      latitude: loc.lat.toString(),
+      longitude: loc.lng.toString(),
+      city: loc.name,
+      address: loc.name + ', Kenya'
+    });
+    setAddressVerified(true);
+  };
+
   // Validate before proceeding
   const validateStep = () => {
     if (step === 1) {
@@ -159,16 +229,21 @@ export default function AddPropertyForm({ onBack }) {
       return true;
     }
     if (step === 2) {
+      // Allow skipping location
       if (!formData.latitude || !formData.longitude) {
-        toast.error('Please select a valid location');
-        return false;
+        const confirm = window.confirm(
+          '⚠️ No location selected!\n\nYou can add the property location later from Property Settings.\n\nContinue without location?'
+        );
+        if (!confirm) return false;
       }
-      // Check if within Kenya bounds (rough)
-      const lat = parseFloat(formData.latitude);
-      const lng = parseFloat(formData.longitude);
-      if (lat < -5 || lat > 5 || lng < 33 || lng > 42) {
-        if (!window.confirm('This location appears to be outside Kenya. Continue anyway?')) {
-          return false;
+      // If location is set, validate Kenya bounds
+      if (formData.latitude && formData.longitude) {
+        const lat = parseFloat(formData.latitude);
+        const lng = parseFloat(formData.longitude);
+        if (lat < -5 || lat > 5 || lng < 33 || lng > 42) {
+          if (!window.confirm('This location appears to be outside Kenya. Continue anyway?')) {
+            return false;
+          }
         }
       }
       return true;
@@ -186,100 +261,99 @@ export default function AddPropertyForm({ onBack }) {
     setStep(step - 1);
   };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      toast.error('Authentication error. Please login again.');
+      if (userError || !user) {
+        toast.error('Authentication error. Please login again.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('📝 Submitting property for user:', user.id, user.email);
+
+      // Check for duplicate properties
+      const { data: existingProperties, error: duplicateError } = await supabase
+        .from('properties')
+        .select('id, name, latitude, longitude')
+        .eq('property_manager_id', user.id);
+
+      if (duplicateError) {
+        console.error('Error checking duplicates:', duplicateError);
+      }
+
+      const isDuplicate = existingProperties?.some(p => {
+        const dist = calculateDistance(
+          parseFloat(p.latitude), parseFloat(p.longitude),
+          parseFloat(formData.latitude), parseFloat(formData.longitude)
+        );
+        return p.name.toLowerCase() === formData.name.toLowerCase() || dist < 0.1;
+      });
+
+      if (isDuplicate) {
+        toast.error('A property with this name or location already exists');
+        setLoading(false);
+        return;
+      }
+
+      // 🔥 CRITICAL: Ensure moderation_status is 'pending'
+      const propertyData = {
+        name: formData.name,
+        address: formData.address,
+        city: formData.city,
+        latitude: formData.latitude || null,
+        longitude: formData.longitude || null,
+        total_units: parseInt(formData.total_units),
+        vacant_units: parseInt(formData.vacant_units),
+        caretaker_name: formData.caretaker_name,
+        caretaker_phone: formData.caretaker_phone,
+        is_visible_on_map: false, // Hidden until approved
+        moderation_status: 'pending', // 🔥 MUST be pending
+        approved_by_sa: false,
+        sa_visibility_override: false,
+        property_manager_id: user.id,
+        created_at: new Date().toISOString()
+      };
+
+      console.log('📦 Inserting property:', propertyData);
+
+      const { data, error } = await supabase
+        .from('properties')
+        .insert([propertyData])
+        .select();
+
+      if (error) {
+        console.error('❌ INSERT ERROR:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          full_error: error
+        });
+        
+        alert(`Error inserting property:\n\nMessage: ${error.message}\nCode: ${error.code}\n\nDetails: ${JSON.stringify(error.details || 'none')}`);
+        
+        throw error;
+      }
+
+      toast.success('Property submitted for approval! It will appear once verified by Supreme Admin.');
+
+      // Simple redirect
+      setTimeout(() => {
+        window.location.href = '/admin/occupancy';
+      }, 1000);
+      
+    } catch (error) {
+      console.error('❌ Error:', error);
+      toast.error('Failed to add property: ' + error.message);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    console.log('📝 Submitting property for user:', user.id, user.email);
-
-    // Check for duplicate properties
-    const {  existingProperties, error: duplicateError } = await supabase
-      .from('properties')
-      .select('id, name, latitude, longitude')
-      .eq('property_manager_id', user.id);
-
-    if (duplicateError) {
-      console.error('Error checking duplicates:', duplicateError);
-    }
-
-    const isDuplicate = existingProperties?.some(p => {
-      const dist = calculateDistance(
-        parseFloat(p.latitude), parseFloat(p.longitude),
-        parseFloat(formData.latitude), parseFloat(formData.longitude)
-      );
-      return p.name.toLowerCase() === formData.name.toLowerCase() || dist < 0.1;
-    });
-
-    if (isDuplicate) {
-      toast.error('A property with this name or location already exists');
-      setLoading(false);
-      return;
-    }
-
-    // 🔥 CRITICAL: Ensure moderation_status is 'pending'
-    const propertyData = {
-      name: formData.name,
-      address: formData.address,
-      city: formData.city,
-      latitude: formData.latitude,
-      longitude: formData.longitude,
-      total_units: parseInt(formData.total_units),
-      vacant_units: parseInt(formData.vacant_units),
-      caretaker_name: formData.caretaker_name,
-      caretaker_phone: formData.caretaker_phone,
-      is_visible_on_map: false, // Hidden until approved
-      moderation_status: 'pending', // 🔥 MUST be pending
-      approved_by_sa: false,
-      sa_visibility_override: false,
-      property_manager_id: user.id,
-      created_at: new Date().toISOString()
-    };
-
-    console.log('📦 Inserting property:', propertyData);
-
-    const { data, error } = await supabase
-      .from('properties')
-      .insert([propertyData])
-      .select();
-
-    if (error) {
-  console.error('❌ INSERT ERROR:', {
-    message: error.message,
-    code: error.code,
-    details: error.details,
-    hint: error.hint,
-    full_error: error
-  });
-  
-  // Show alert with full error
-  alert(`Error inserting property:\n\nMessage: ${error.message}\nCode: ${error.code}\n\nDetails: ${JSON.stringify(error.details || 'none')}`);
-  
-  throw error;
-}
-
-  toast.success('Property submitted for approval! It will appear once verified by Supreme Admin.');
-
-// Simple redirect instead of using onNav
-setTimeout(() => {
-  window.location.href = '/admin/occupancy';
-}, 1000);
-    
-  } catch (error) {
-    console.error('❌ Error:', error);
-    toast.error('Failed to add property: ' + error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Helper: Calculate distance in km
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -334,7 +408,7 @@ setTimeout(() => {
                     placeholder="e.g., Sunset Apartments"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}
                   />
                 </div>
 
@@ -350,7 +424,7 @@ setTimeout(() => {
                       placeholder="e.g., 20"
                       value={formData.total_units}
                       onChange={(e) => setFormData({...formData, total_units: e.target.value})}
-                      style={{ width: '100%' }}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}
                     />
                   </div>
                   <div>
@@ -365,7 +439,7 @@ setTimeout(() => {
                       placeholder="e.g., 5"
                       value={formData.vacant_units}
                       onChange={(e) => setFormData({...formData, vacant_units: e.target.value})}
-                      style={{ width: '100%' }}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}
                     />
                   </div>
                 </div>
@@ -377,15 +451,15 @@ setTimeout(() => {
                   <textarea
                     rows={3}
                     placeholder="Brief description of the property..."
-                    value={formData.description}
+                    value={formData.description || ''}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    style={{ width: '100%', resize: 'vertical' }}
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)', resize: 'vertical' }}
                   />
                 </div>
               </div>
 
               <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={nextStep} className="btn btn-primary">
+                <button type="button" onClick={nextStep} className="btn btn-primary" style={{ padding: '12px 24px' }}>
                   Continue to Location →
                 </button>
               </div>
@@ -426,9 +500,7 @@ setTimeout(() => {
                     Getting your location...
                   </>
                 ) : (
-                  <>
-                    📍 Use My Current Location
-                  </>
+                  <>📍 Use My Current Location (GPS)</>
                 )}
               </button>
 
@@ -443,13 +515,13 @@ setTimeout(() => {
                 </label>
                 <input
                   type="text"
-                  placeholder="Type address (e.g., Ngong Road, Nairobi)"
+                  placeholder="Type address (e.g., 'Ngong Road Nairobi', 'Kilifi')"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     searchAddress(e.target.value);
                   }}
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}
                 />
                 
                 {/* Suggestions */}
@@ -475,10 +547,9 @@ setTimeout(() => {
                         style={{
                           padding: '12px',
                           cursor: 'pointer',
-                          borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none'
+                          borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none',
+                          ':hover': { background: '#f9fafb' }
                         }}
-                        onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                        onMouseLeave={(e) => e.target.style.background = 'white'}
                       >
                         <div style={{ fontWeight: 600 }}>{s.display_name.split(',')[0]}</div>
                         <div style={{ fontSize: '12px', color: 'var(--gray)' }}>{s.display_name}</div>
@@ -488,60 +559,130 @@ setTimeout(() => {
                 )}
               </div>
 
-              {/* Map Preview */}
-              {location && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{
-                    height: '300px',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    border: '2px solid var(--border)'
-                  }}>
-                    <MapContainer
-                      center={[location.lat, location.lng]}
-                      zoom={15}
-                      style={{ height: '100%', width: '100%' }}
+              {/* 🔥 QUICK LOCATION PRESETS */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
+                  🏙️ Quick Select - Common Locations
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
+                  {quickLocations.map((loc) => (
+                    <button
+                      key={loc.name}
+                      type="button"
+                      onClick={() => handleQuickLocation(loc)}
+                      style={{
+                        padding: '8px 12px',
+                        background: 'white',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        textAlign: 'center',
+                        ':hover': { background: '#eff6ff', borderColor: '#3b82f6' }
+                      }}
                     >
-                      <TileLayer
-                        attribution='© OpenStreetMap'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
+                      {loc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 🔥 INTERACTIVE MAP - CLICK TO SELECT */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
+                  🗺️ Or Click on Map to Select Location
+                </label>
+                <div style={{
+                  height: '300px',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  border: '2px solid var(--border)',
+                  marginBottom: '8px'
+                }}>
+                  <MapContainer
+                    center={location ? [location.lat, location.lng] : [-1.2921, 36.8219]}
+                    zoom={location ? 15 : 13}
+                    style={{ height: '100%', width: '100%' }}
+                    scrollWheelZoom={true}
+                  >
+                    <TileLayer
+                      attribution='© OpenStreetMap'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    
+                    {/* 🔥 Click handler for map */}
+                    <MapClickHandler 
+                      onLocationSelect={handleMapLocationSelect}
+                    />
+                    
+                    {location && (
                       <Marker position={[location.lat, location.lng]} icon={DefaultIcon}>
-                        <Popup>{formData.name || 'Property Location'}</Popup>
+                        <Popup>{formData.name || 'Selected Location'}</Popup>
                       </Marker>
-                    </MapContainer>
-                  </div>
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '12px',
-                    background: '#f0fdf4',
-                    border: '1px solid #86efac',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    color: '#166534'
-                  }}>
-                    ✅ Location verified: {formData.address || 'Custom Location'}
-                    {formData.city && `, ${formData.city}`}
+                    )}
+                  </MapContainer>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--gray)', textAlign: 'center' }}>
+                  👆 Click anywhere on the map to drop a pin
+                </div>
+              </div>
+
+              {/* Location Status */}
+              {location && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '12px',
+                  background: '#f0fdf4',
+                  border: '1px solid #86efac',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  color: '#166534'
+                }}>
+                  ✅ Location selected: {formData.address || 'Custom coordinates'}
+                  {formData.city && `, ${formData.city}`}
+                  <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
+                    Lat: {formData.latitude}, Lng: {formData.longitude}
                   </div>
                 </div>
               )}
 
-              {/* Hidden inputs for coordinates */}
+              {/* Hidden inputs */}
               <input type="hidden" name="latitude" value={formData.latitude} />
               <input type="hidden" name="longitude" value={formData.longitude} />
 
+              {/* Navigation */}
               <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-                <button type="button" onClick={prevStep} className="btn">
-                  ← Back
-                </button>
+                <button type="button" onClick={prevStep} className="btn" style={{ padding: '12px 24px' }}>← Back</button>
                 <button 
                   type="button" 
                   onClick={nextStep} 
                   className="btn btn-primary"
-                  disabled={!addressVerified}
-                  style={{ opacity: addressVerified ? 1 : 0.5 }}
+                  style={{ padding: '12px 24px', opacity: location ? 1 : 0.5 }}
                 >
                   Continue to Review →
+                </button>
+              </div>
+              
+              {/* Skip Option */}
+              <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('⚠️ Skip location?\n\nYou can add the property location later from Property Settings.')) {
+                      nextStep();
+                    }
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'transparent',
+                    color: '#6b7280',
+                    border: '1px solid #6b7280',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px'
+                  }}
+                >
+                  ⏭️ Add location later
                 </button>
               </div>
             </div>
@@ -557,9 +698,9 @@ setTimeout(() => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '14px' }}>
                   <div><strong>Name:</strong> {formData.name}</div>
                   <div><strong>Units:</strong> {formData.vacant_units} vacant / {formData.total_units} total</div>
-                  <div style={{ gridColumn: 'span 2' }}><strong>Address:</strong> {formData.address}, {formData.city}</div>
+                  <div style={{ gridColumn: 'span 2' }}><strong>Address:</strong> {formData.address || 'Not set'}, {formData.city || ''}</div>
                   <div style={{ gridColumn: 'span 2' }}>
-                    <strong>Location:</strong> {formData.latitude}, {formData.longitude}
+                    <strong>Location:</strong> {formData.latitude && formData.longitude ? `${formData.latitude}, ${formData.longitude}` : 'Not set'}
                   </div>
                 </div>
               </div>
@@ -572,20 +713,20 @@ setTimeout(() => {
                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Name</label>
                     <input
                       type="text"
-                      value={formData.caretaker_name}
+                      value={formData.caretaker_name || ''}
                       onChange={(e) => setFormData({...formData, caretaker_name: e.target.value})}
                       placeholder="John Kamau"
-                      style={{ width: '100%' }}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}
                     />
                   </div>
                   <div>
                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Phone</label>
                     <input
                       type="tel"
-                      value={formData.caretaker_phone}
+                      value={formData.caretaker_phone || ''}
                       onChange={(e) => setFormData({...formData, caretaker_phone: e.target.value})}
                       placeholder="+254 712 345 678"
-                      style={{ width: '100%' }}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}
                     />
                   </div>
                 </div>
@@ -633,14 +774,14 @@ setTimeout(() => {
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="button" onClick={prevStep} className="btn">
+                <button type="button" onClick={prevStep} className="btn" style={{ padding: '12px 24px' }}>
                   ← Back
                 </button>
                 <button 
                   type="submit" 
                   className="btn btn-primary"
                   disabled={loading}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, padding: '12px 24px' }}
                 >
                   {loading ? 'Submitting...' : '✅ Submit Property'}
                 </button>
