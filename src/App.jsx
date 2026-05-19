@@ -369,7 +369,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
           Once your subscription is renewed, you'll regain full access to your dashboard.
         </p>
       </div>
-      <div style={{ position: 'absolute', bottom: 0, width: '100%' }}>
+      <div style={{ marginTop: 'auto', width: '100%' }}>
         <Footer />
       </div>
     </div>
@@ -557,13 +557,13 @@ const AppContent = () => {
   }
 
   return (
-    <div className={isDark ? 'dark' : ''} style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div className={isDark ? 'dark' : ''} style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%' }}>
       <div className="mobile-header">
         <button className="btn" onClick={() => setActivePage('dashboard')}>☰ Menu</button>
         <span>DomusEA</span>
         <button className="btn" onClick={logout}>Logout</button>
       </div>
-      <div className="app" style={{ flex: 1, display: 'flex' }}>
+      <div className="app" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <Sidebar 
           active={activePage} 
           onNav={setActivePage} 
@@ -573,7 +573,7 @@ const AppContent = () => {
           role={userProfile.role} 
           user={userProfile} 
         />
-        <main className="main" style={{ flex: 1 }}>
+        <main className="main" style={{ flex: 1, overflowY: 'auto', paddingBottom: '20px' }}>
           <DashboardContent activePage={activePage} role={userProfile.role} userProfile={userProfile} />
         </main>
       </div>
