@@ -75,26 +75,49 @@ const LoginScreen = () => {
     branding: { marginTop: '40px' },
     logo: { fontSize: '24px', fontWeight: '700', marginBottom: '8px' },
     tagline: { fontSize: '14px', opacity: 0.8 },
-    rightPanel: { flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', position: 'relative' },
+    rightPanel: { 
+      flex: 1, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      background: 'var(--bg, #ffffff)', 
+      color: 'var(--text, #111827)',
+      position: 'relative',
+      transition: 'background 0.3s, color 0.3s'
+    },
     topBar: { padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', flexShrink: 0 },
     contactInfo: { display: 'flex', gap: '24px', alignItems: 'center' },
     contactItem: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#374151', fontWeight: '500' },
     whatsappText: { color: '#10b981', fontWeight: '600' },
-    developerInfo: { fontSize: '13px', color: '#6b7280' },
-    developer: { color: '#667eea', fontWeight: '600' },
+    developerInfo: { fontSize: '13px', color: 'var(--gray, #6b7280)' },
+    developer: { color: 'var(--blue, #667eea)', fontWeight: '600' },
     loginContainer: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '60px 40px', maxWidth: '450px', margin: '0 auto', width: '100%' },
     header: { marginBottom: '40px' },
-    logoSmall: { fontSize: '20px', fontWeight: '700', color: '#667eea', marginBottom: '20px' },
-    welcomeTitle: { fontSize: '32px', fontWeight: '700', color: '#111827', marginBottom: '8px', letterSpacing: '-0.5px' },
-    welcomeSubtitle: { fontSize: '15px', color: '#6b7280', lineHeight: '1.5' },
+    logoSmall: { fontSize: '20px', fontWeight: '700', color: 'var(--blue, #667eea)', marginBottom: '20px' },
+    welcomeTitle: { fontSize: '32px', fontWeight: '700', color: 'var(--text, #111827)', marginBottom: '8px', letterSpacing: '-0.5px' },
+    welcomeSubtitle: { fontSize: '15px', color: 'var(--gray, #6b7280)', lineHeight: '1.5' },
     form: { display: 'flex', flexDirection: 'column', gap: '24px' },
     inputGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
-    label: { fontSize: '14px', fontWeight: '600', color: '#374151', letterSpacing: '0.3px' },
+    label: { fontSize: '14px', fontWeight: '600', color: 'var(--text, #111827)', letterSpacing: '0.3px' },
     inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
-    inputIcon: { position: 'absolute', left: '16px', fontSize: '18px', zIndex: 1, opacity: 0.5 },
-    input: { width: '100%', padding: '14px 16px 14px 48px', border: '2px solid #e5e7eb', borderRadius: '12px', fontSize: '15px', outline: 'none', background: '#f9fafb', boxSizing: 'border-box' },
-    signInButton: { width: '100%', padding: '16px', background: '#111827', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
-    footer: { padding: '24px 40px', borderTop: '1px solid #e5e7eb', background: '#f9fafb', flexShrink: 0 },
+    inputIcon: { position: 'absolute', left: '16px', fontSize: '18px', zIndex: 1, opacity: 0.7 },
+    input: { 
+      width: '100%', 
+      padding: '14px 16px 14px 48px', 
+      border: '2px solid var(--border, #e5e7eb)', 
+      borderRadius: '12px', 
+      fontSize: '15px', 
+      outline: 'none', 
+      background: 'var(--input-bg, #f9fafb)', 
+      color: 'var(--text, #111827)',
+      boxSizing: 'border-box' 
+    },
+    signInButton: { width: '100%', padding: '16px', background: 'var(--text, #111827)', color: 'var(--bg, #ffffff)', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
+    footer: { 
+      padding: '24px 40px', 
+      borderTop: '1px solid var(--border, #e5e7eb)', 
+      background: 'var(--footer-bg, #f9fafb)', 
+      flexShrink: 0 
+    },
     securityBadge: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', color: '#9ca3af', fontWeight: '500' }
   };
 
@@ -121,7 +144,7 @@ const LoginScreen = () => {
   }
 
   return (
-    <div style={loginStyles.container}>
+    <div className={isDark ? 'dark' : ''} style={loginStyles.container}>
       <div className="login-left" style={loginStyles.leftPanel}>
         <div style={loginStyles.overlay}>
           <div style={loginStyles.quoteContainer}>
@@ -408,7 +431,7 @@ const AppContent = () => {
 
   // Show login if no user
   if (!userProfile) {
-    return <LoginScreen />;
+    return <LoginScreen isDark={isDark} />;
   }
 
   // Show frozen screen if admin is frozen

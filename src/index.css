@@ -17,6 +17,8 @@
   --purple: #9f7aea;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --input-bg: #f9fafb;
+  --footer-bg: #f9fafb;
 }
 
 .dark {
@@ -32,6 +34,8 @@
   --purple: #9f7aea;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --input-bg: #1e293b;
+  --footer-bg: #0f172a;
 }
 
 /* ========== GLOBAL RESETS ========== */
