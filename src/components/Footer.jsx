@@ -4,86 +4,37 @@ import React from 'react';
 const Footer = () => {
   return (
     <footer style={{
-      background: '#111827',
-      color: '#f3f4f6',
-      padding: '20px 15px',
+      background: '#0f172a',
+      color: '#94a3b8',
+      padding: '8px 15px',
       textAlign: 'center',
-      borderTop: '1px solid #374151',
+      borderTop: '1px solid #1e293b',
       width: '100%',
       boxSizing: 'border-box',
-      zIndex: 100,
-      position: 'relative'
+      fontSize: '11px',
+      zIndex: 100
     }}>
       <div style={{ 
         maxWidth: '1200px', 
         margin: '0 auto',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: '15px',
+        flexWrap: 'wrap'
       }}>
-        <p style={{ 
-          margin: 0, 
-          fontSize: '13px', 
-          opacity: 0.8,
-          lineHeight: '1.4'
-        }}>
-          © {new Date().getFullYear()} DomusEA Platform. All rights reserved. | Developed by <strong>Elizon Tech.</strong>
-        </p>
+        <span>© {new Date().getFullYear()} DomusEA | Developed by <strong>Elizon Tech.</strong></span>
         
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          gap: '15px', 
-          flexWrap: 'wrap',
-          alignItems: 'center' 
-        }}>
-          <a 
-            href="tel:0711333436" 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              color: '#10b981', 
-              textDecoration: 'none', 
-              fontWeight: '600', 
-              fontSize: '14px',
-              padding: '6px 12px',
-              background: 'rgba(16, 185, 129, 0.1)',
-              borderRadius: '6px'
-            }}
-          >
-            <span>📞</span> 0711 333 436
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <a href="tel:0711333436" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '500' }}>
+            📞 0711 333 436
           </a>
-          
-          <a 
-            href="https://wa.me/254711333436" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              color: '#25D366', 
-              textDecoration: 'none', 
-              fontWeight: '600', 
-              fontSize: '14px',
-              padding: '6px 12px',
-              background: 'rgba(37, 211, 102, 0.1)',
-              borderRadius: '6px'
-            }}
-          >
-            <span>💬</span> WhatsApp
+          <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: '500' }}>
+            💬 WhatsApp
           </a>
         </div>
-        
-        <p style={{ 
-          margin: 0, 
-          fontSize: '11px', 
-          color: '#9ca3af',
-          letterSpacing: '0.5px'
-        }}>
-          AUTHORIZED PERSONNEL ONLY • SECURE PROPERTY MANAGEMENT
-        </p>
+
+        <span style={{ opacity: 0.6, fontSize: '10px', textTransform: 'uppercase' }}>Authorized Only</span>
       </div>
     </footer>
   );

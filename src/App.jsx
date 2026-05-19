@@ -369,9 +369,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
           Once your subscription is renewed, you'll regain full access to your dashboard.
         </p>
       </div>
-      <div style={{ marginTop: 'auto', width: '100%' }}>
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 };
