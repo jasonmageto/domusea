@@ -21,6 +21,7 @@ import SAPayments from './components/SAPayments';
 import SAAnnouncements from './components/SAAnnouncements';
 import SARevenueAnalytics from './components/SARevenueAnalytics';
 import AdminRevenueAnalytics from './components/AdminRevenueAnalytics';
+import Footer from './components/Footer';
 
 // Map & Property Components
 import PropertySearch from './components/PropertySearch';
@@ -274,6 +275,7 @@ const LoginScreen = () => {
       </div>
 
       <style>{`@media (max-width: 768px) { .login-left { display: none !important; } .login-right { width: '100%; flex: none; } }`}</style>
+      <Footer />
     </div>
   );
 };
@@ -366,6 +368,9 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
         <p style={{ margin: '24px 0 0 0', fontSize: 12, color: '#9ca3af' }}>
           Once your subscription is renewed, you'll regain full access to your dashboard.
         </p>
+      </div>
+      <div style={{ position: 'absolute', bottom: 0, width: '100%' }}>
+        <Footer />
       </div>
     </div>
   );
@@ -552,13 +557,13 @@ const AppContent = () => {
   }
 
   return (
-    <div className={isDark ? 'dark' : ''}>
+    <div className={isDark ? 'dark' : ''} style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <div className="mobile-header">
         <button className="btn" onClick={() => setActivePage('dashboard')}>☰ Menu</button>
         <span>DomusEA</span>
         <button className="btn" onClick={logout}>Logout</button>
       </div>
-      <div className="app">
+      <div className="app" style={{ flex: 1, display: 'flex' }}>
         <Sidebar 
           active={activePage} 
           onNav={setActivePage} 
@@ -568,10 +573,11 @@ const AppContent = () => {
           role={userProfile.role} 
           user={userProfile} 
         />
-        <main className="main">
+        <main className="main" style={{ flex: 1 }}>
           <DashboardContent activePage={activePage} role={userProfile.role} userProfile={userProfile} />
         </main>
       </div>
+      <Footer />
     </div>
   );
 };
