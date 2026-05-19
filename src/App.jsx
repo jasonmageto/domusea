@@ -137,16 +137,6 @@ const LoginScreen = () => {
       </div>
 
       <div className="login-right" style={loginStyles.rightPanel}>
-        <div style={loginStyles.topBar}>
-          <div style={loginStyles.contactInfo}>
-            <span style={loginStyles.contactItem}><span>📞</span> 0711 333 436</span>
-            <span style={loginStyles.contactItem}><span>💬</span> <span style={loginStyles.whatsappText}>WhatsApp</span></span>
-          </div>
-          <div style={loginStyles.developerInfo}>
-            © 2026 DomusEA | Developed by <span style={loginStyles.developer}>Elizon Tech</span>
-          </div>
-        </div>
-
         <div style={loginStyles.loginContainer}>
           <div style={loginStyles.header}>
             <div style={loginStyles.logoSmall}>🏠 DomusEA</div>
@@ -176,13 +166,17 @@ const LoginScreen = () => {
               <span>{loading ? 'Signing In...' : 'Sign In'}</span>
               <span style={{ fontSize: '18px' }}>→</span>
             </button>
+            <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginTop: '8px' }}>Restricted Access • Authorized Personnel Only</p>
           </form>
         </div>
 
-        <div style={loginStyles.footer}>
-          <div style={loginStyles.securityBadge}>
-            <span>🔐</span>
-            <span>Restricted Access • Authorized Personnel Only</span>
+        <div style={{ ...loginStyles.footer, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 40px', fontSize: '12px' }}>
+          <div style={{ display: 'flex', gap: '20px' }}>
+            <span style={{ color: '#374151' }}>📞 0711 333 436</span>
+            <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>💬 WhatsApp</a>
+          </div>
+          <div style={{ color: '#6b7280' }}>
+            © 2026 DomusEA | Developed by <span style={{ color: '#667eea', fontWeight: '600' }}>Elizon Tech</span>
           </div>
         </div>
       </div>
