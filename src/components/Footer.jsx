@@ -4,37 +4,37 @@ import React from 'react';
 const Footer = () => {
   return (
     <footer style={{
-      background: '#0f172a',
-      color: '#94a3b8',
-      padding: '8px 15px',
-      textAlign: 'center',
-      borderTop: '1px solid #1e293b',
+      padding: '16px 40px',
+      borderTop: '1px solid #e5e7eb',
+      background: '#f9fafb',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      flexShrink: 0,
       width: '100%',
-      boxSizing: 'border-box',
-      fontSize: '11px',
-      zIndex: 100
+      boxSizing: 'border-box'
     }}>
-      <div style={{ 
-        maxWidth: '1200px', 
-        margin: '0 auto',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: '15px',
-        flexWrap: 'wrap'
-      }}>
-        <span>© {new Date().getFullYear()} DomusEA | Developed by <strong>Elizon Tech.</strong></span>
-        
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <a href="tel:0711333436" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '500' }}>
-            📞 0711 333 436
-          </a>
-          <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: '500' }}>
-            💬 WhatsApp
-          </a>
-        </div>
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151', fontWeight: '500' }}>
+          <span>📞</span> 0711 333 436
+        </span>
+        <a 
+          href="https://wa.me/254711333436" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#10b981', fontWeight: '600', textDecoration: 'none' }}
+        >
+          <span>💬</span> WhatsApp
+        </a>
+      </div>
 
-        <span style={{ opacity: 0.6, fontSize: '10px', textTransform: 'uppercase' }}>Authorized Only</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>🔐</span> Restricted Access
+        </div>
+        <div style={{ fontSize: '12px', color: '#6b7280' }}>
+          © 2026 DomusEA | Developed by <span style={{ color: '#667eea', fontWeight: '600' }}>Elizon Tech</span>
+        </div>
       </div>
     </footer>
   );

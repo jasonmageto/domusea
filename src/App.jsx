@@ -37,338 +37,199 @@ const LoginScreen = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
- const handleLogin = async (e) => {
-  e.preventDefault();
-  setError('');
-  setLoading(true);
-  try {
-    await login(email, password);
-  } catch (err) {
-    console.error('Login error:', err.message);
-    // Check for frozen account errors using .includes()
-    if (err.message && err.message.includes('ACCOUNT_FROZEN_BY_ADMIN')) {
-      setError('FROZEN_TENANT');
-    } else if (err.message && err.message.includes('SUBSCRIPTION_FROZEN')) {
-      setError('FROZEN_ADMIN');
-    } else {
-      setError(err.message || 'Failed to sign in');
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await login(email, password);
+    } catch (err) {
+      console.error('Login error:', err.message);
+      if (err.message && err.message.includes('ACCOUNT_FROZEN_BY_ADMIN')) {
+        setError('FROZEN_TENANT');
+      } else if (err.message && err.message.includes('SUBSCRIPTION_FROZEN')) {
+        setError('FROZEN_ADMIN');
+      } else {
+        setError(err.message || 'Failed to sign in');
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-  // 🔥 FROZEN TENANT SCREEN
-  if (error === 'FROZEN_TENANT') {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f3f4f6',
-        padding: 20
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: 12,
-          padding: 40,
-          maxWidth: 450,
-          width: '100%',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>⏳</div>
-          <h2 style={{ margin: '0 0 16px 0', color: '#1f2937' }}>
-            Account Temporarily Unavailable
-          </h2>
-          <p style={{ margin: '0 0 24px 0', color: '#6b7280', lineHeight: 1.6 }}>
-            Your property manager's account is currently inactive due to a maintenance issue.
-          </p>
-          <div style={{
-            padding: 16,
-            background: '#fef3c7',
-            borderRadius: 8,
-            marginBottom: 24,
-            textAlign: 'left'
-          }}>
-            <strong style={{ color: '#92400e' }}>What to do:</strong>
-            <ul style={{ margin: '8px 0 0 0', paddingLeft: 20, color: '#92400e', lineHeight: 1.8 }}>
-              <li>Contact your Manager</li>
-              <li>They need to renew their subscription</li>
-              <li>You'll regain access immediately after. Kindly be patient.</li>
-            </ul>
-          </div>
-          <button
-            onClick={() => {
-              setError('');
-              setEmail('');
-              setPassword('');
-              window.location.reload();
-            }}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: '#111827',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Back to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const loginStyles = {
+    container: { display: 'flex', minHeight: '100vh', fontFamily: "'Inter', sans-serif" },
+    leftPanel: { flex: 1, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', position: 'relative', display: 'flex', alignItems: 'center', padding: '60px' },
+    overlay: { position: 'relative', zIndex: 2, maxWidth: '500px' },
+    quoteContainer: { color: 'white' },
+    quoteHeader: { fontSize: '12px', fontWeight: '600', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px', opacity: 0.9 },
+    mainQuote: { fontSize: '48px', fontWeight: '700', lineHeight: '1.2', marginBottom: '30px', letterSpacing: '-1px' },
+    quoteText: { fontSize: '16px', lineHeight: '1.8', opacity: 0.9, marginBottom: '40px', fontStyle: 'italic' },
+    branding: { marginTop: '40px' },
+    logo: { fontSize: '24px', fontWeight: '700', marginBottom: '8px' },
+    tagline: { fontSize: '14px', opacity: 0.8 },
+    rightPanel: { flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', position: 'relative' },
+    topBar: { padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', flexShrink: 0 },
+    contactInfo: { display: 'flex', gap: '24px', alignItems: 'center' },
+    contactItem: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#374151', fontWeight: '500' },
+    whatsappText: { color: '#10b981', fontWeight: '600' },
+    developerInfo: { fontSize: '13px', color: '#6b7280' },
+    developer: { color: '#667eea', fontWeight: '600' },
+    loginContainer: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '60px 40px', maxWidth: '450px', margin: '0 auto', width: '100%' },
+    header: { marginBottom: '40px' },
+    logoSmall: { fontSize: '20px', fontWeight: '700', color: '#667eea', marginBottom: '20px' },
+    welcomeTitle: { fontSize: '32px', fontWeight: '700', color: '#111827', marginBottom: '8px', letterSpacing: '-0.5px' },
+    welcomeSubtitle: { fontSize: '15px', color: '#6b7280', lineHeight: '1.5' },
+    form: { display: 'flex', flexDirection: 'column', gap: '24px' },
+    inputGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
+    label: { fontSize: '14px', fontWeight: '600', color: '#374151', letterSpacing: '0.3px' },
+    inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
+    inputIcon: { position: 'absolute', left: '16px', fontSize: '18px', zIndex: 1, opacity: 0.5 },
+    input: { width: '100%', padding: '14px 16px 14px 48px', border: '2px solid #e5e7eb', borderRadius: '12px', fontSize: '15px', outline: 'none', background: '#f9fafb', boxSizing: 'border-box' },
+    signInButton: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
+    footer: { padding: '24px 40px', borderTop: '1px solid #e5e7eb', background: '#f9fafb', flexShrink: 0 },
+    securityBadge: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', color: '#9ca3af', fontWeight: '500' }
+  };
 
-  // 🔥 FROZEN ADMIN SCREEN
-  if (error === 'FROZEN_ADMIN') {
+  if (error === 'FROZEN_TENANT' || error === 'FROZEN_ADMIN') {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f3f4f6',
-        padding: 20
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: 12,
-          padding: 40,
-          maxWidth: 450,
-          width: '100%',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
-          <h2 style={{ margin: '0 0 16px 0', color: '#dc2626' }}>
-            Subscription Expired
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', padding: 20 }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: 40, maxWidth: 450, width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>{error === 'FROZEN_TENANT' ? '⏳' : '🔒'}</div>
+          <h2 style={{ margin: '0 0 16px 0', color: error === 'FROZEN_TENANT' ? '#1f2937' : '#dc2626' }}>
+            {error === 'FROZEN_TENANT' ? 'Account Temporarily Unavailable' : 'Subscription Expired'}
           </h2>
           <p style={{ margin: '0 0 24px 0', color: '#6b7280' }}>
-            Your account has been frozen due to an overdue subscription.
+            {error === 'FROZEN_TENANT' ? "Your property manager's account is currently inactive." : "Your account has been frozen due to an overdue subscription."}
           </p>
-          <div style={{
-            padding: 16,
-            background: '#fee2e2',
-            borderRadius: 8,
-            marginBottom: 24
-          }}>
-            <strong style={{ color: '#991b1b' }}>Contact to Renew:</strong><br/>
-            <span style={{ color: '#991b1b' }}>
-              📞 0711 333 436<br/>
-              📧 sa@domusea.com
-            </span>
+          <div style={{ padding: 16, background: error === 'FROZEN_TENANT' ? '#fef3c7' : '#fee2e2', borderRadius: 8, marginBottom: 24 }}>
+            <strong style={{ color: error === 'FROZEN_TENANT' ? '#92400e' : '#991b1b' }}>Contact to Renew:</strong><br/>
+            <span style={{ color: error === 'FROZEN_TENANT' ? '#92400e' : '#991b1b' }}>📞 0711 333 436<br/>📧 sa@domusea.com</span>
           </div>
-          <button
-            onClick={() => window.location.href = 'tel:0711333436'}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer',
-              marginBottom: 12
-            }}
-          >
-            📞 Call Now
-          </button>
-          <button
-            onClick={() => {
-              setError('');
-              setEmail('');
-              setPassword('');
-            }}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: '#f3f4f6',
-              color: '#374151',
-              border: '2px solid #d1d5db',
-              borderRadius: 6,
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Back to Login
-          </button>
+          <button onClick={() => window.location.href = 'tel:0711333436'} style={{ ...loginStyles.signInButton, marginBottom: 12 }}>📞 Call Now</button>
+          <button onClick={() => { setError(''); setEmail(''); setPassword(''); }} style={{ ...loginStyles.signInButton, background: '#f3f4f6', color: '#374151' }}>Back to Login</button>
         </div>
       </div>
     );
   }
 
-  // ✅ DEFAULT LOGIN FORM
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', fontFamily: "'Inter', sans-serif", background: '#fff' }}>
-      <div className="login-left" style={{
-        flex: 1,
-        background: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80') center/cover no-repeat`,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '60px',
-        color: 'white'
-      }}>
-        <div style={{ maxWidth: '450px' }}>
-          <h3 style={{ textTransform: 'uppercase', letterSpacing: '2px', fontSize: '14px', marginBottom: '20px', opacity: 0.8 }}>A WISE QUOTE</h3>
-          <h1 style={{ fontSize: '48px', lineHeight: '1.1', fontWeight: '700', marginBottom: '24px' }}>Build Better.<br/>Manage Smarter.</h1>
-          <p style={{ fontSize: '18px', lineHeight: '1.6', opacity: 0.9 }}>
-            "The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."
-          </p>
+    <div style={loginStyles.container}>
+      <div className="login-left" style={loginStyles.leftPanel}>
+        <div style={loginStyles.overlay}>
+          <div style={loginStyles.quoteContainer}>
+            <div style={loginStyles.quoteHeader}>A WISE QUOTE</div>
+            <h1 style={loginStyles.mainQuote}>Build Better.<br/>Manage Smarter.</h1>
+            <p style={loginStyles.quoteText}>"The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."</p>
+            <div style={loginStyles.branding}>
+              <div style={loginStyles.logo}>🏠 DomusEA</div>
+              <div style={loginStyles.tagline}>Property Management Redefined</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="login-right" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: '400px' }}>
-          <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ fontSize: '32px', fontWeight: '600', color: '#111', margin: '0 0 8px 0' }}>Welcome Back</h2>
-            <p style={{ color: '#666', margin: 0 }}>Enter your credentials to access your account</p>
+      <div className="login-right" style={loginStyles.rightPanel}>
+        <div style={loginStyles.topBar}>
+          <div style={loginStyles.contactInfo}>
+            <span style={loginStyles.contactItem}><span>📞</span> 0711 333 436</span>
+            <span style={loginStyles.contactItem}><span>💬</span> <span style={loginStyles.whatsappText}>WhatsApp</span></span>
+          </div>
+          <div style={loginStyles.developerInfo}>
+            © 2026 DomusEA | Developed by <span style={loginStyles.developer}>Elizon Tech</span>
+          </div>
+        </div>
+
+        <div style={loginStyles.loginContainer}>
+          <div style={loginStyles.header}>
+            <div style={loginStyles.logoSmall}>🏠 DomusEA</div>
+            <h2 style={loginStyles.welcomeTitle}>Welcome Back</h2>
+            <p style={loginStyles.welcomeSubtitle}>Enter your credentials to access your account</p>
           </div>
 
-          <form onSubmit={handleLogin}>
-            {error && error !== 'FROZEN_TENANT' && error !== 'FROZEN_ADMIN' && (
-              <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
-                ⚠️ {error}
-              </div>
+          <form style={loginStyles.form} onSubmit={handleLogin}>
+            {error && (
+              <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '14px' }}>⚠️ {error}</div>
             )}
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px', color: '#333' }}>Email Address</label>
-              <input 
-                type="email" 
-                placeholder="Enter your email" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                required 
-                style={{ width: '100%', padding: '12px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '16px', boxSizing: 'border-box' }} 
-              />
+            <div style={loginStyles.inputGroup}>
+              <label style={loginStyles.label}>Email Address</label>
+              <div style={loginStyles.inputWrapper}>
+                <span style={loginStyles.inputIcon}>📧</span>
+                <input type="email" placeholder="name@company.com" style={loginStyles.input} value={email} onChange={e => setEmail(e.target.value)} required />
+              </div>
             </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px', color: '#333' }}>Password</label>
-              <input 
-                type="password" 
-                placeholder="Enter your password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                required 
-                style={{ width: '100%', padding: '12px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '16px', boxSizing: 'border-box' }} 
-              />
+            <div style={loginStyles.inputGroup}>
+              <label style={loginStyles.label}>Password</label>
+              <div style={loginStyles.inputWrapper}>
+                <span style={loginStyles.inputIcon}>🔒</span>
+                <input type="password" placeholder="••••••••" style={loginStyles.input} value={password} onChange={e => setPassword(e.target.value)} required />
+              </div>
             </div>
-
-            <button type="submit" disabled={loading} style={{ width: '100%', padding: '14px', background: '#111', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', marginBottom: '24px', opacity: loading ? 0.7 : 1 }}>
-              {loading ? 'Logging in...' : 'Sign In'}
+            <button type="submit" disabled={loading} style={loginStyles.signInButton}>
+              <span>{loading ? 'Signing In...' : 'Sign In'}</span>
+              <span style={{ fontSize: '18px' }}>→</span>
             </button>
-            
-            <p style={{ textAlign: 'center', color: '#888', fontSize: '14px' }}>Restricted Access • Authorized Personnel Only</p>
           </form>
         </div>
-      </div>
 
-      <style>{`@media (max-width: 768px) { .login-left { display: none !important; } .login-right { width: '100%; flex: none; } }`}</style>
-      <Footer />
+        <div style={loginStyles.footer}>
+          <div style={loginStyles.securityBadge}>
+            <span>🔐</span>
+            <span>Restricted Access • Authorized Personnel Only</span>
+          </div>
+        </div>
+      </div>
+      <style>{`@media (max-width: 768px) { .login-left { display: none !important; } }`}</style>
     </div>
   );
 };
 
 // --- SUBSCRIPTION EXPIRED PAGE ---
 const SubscriptionExpired = ({ userProfile, logout }) => {
+  const expiredStyles = {
+    container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb', fontFamily: "'Inter', sans-serif" },
+    topBar: { padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', background: '#ffffff' },
+    content: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' },
+    card: { background: 'white', borderRadius: '16px', padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' },
+    icon: { fontSize: '48px', marginBottom: '20px' },
+    title: { fontSize: '28px', fontWeight: '700', color: '#111827', marginBottom: '16px' },
+    text: { fontSize: '15px', color: '#6b7280', lineHeight: '1.6', marginBottom: '32px' },
+    details: { background: '#f3f4f6', borderRadius: '12px', padding: '20px', textAlign: 'left', marginBottom: '24px' },
+    button: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' },
+    secondaryButton: { width: '100%', padding: '14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }
+  };
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: 20
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: 16,
-        padding: 40,
-        maxWidth: 500,
-        width: '100%',
-        textAlign: 'center',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-      }}>
-        <div style={{
-          width: 80,
-          height: 80,
-          background: '#fee2e2',
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 24px',
-          fontSize: 40
-        }}>
-          ⚠️
+    <div style={expiredStyles.container}>
+      <div style={expiredStyles.topBar}>
+        <div style={{ fontSize: '20px', fontWeight: '700', color: '#667eea' }}>🏠 DomusEA</div>
+        <div style={{ fontSize: '13px', color: '#6b7280' }}>
+          © 2026 DomusEA | Developed by <span style={{ color: '#667eea', fontWeight: '600' }}>Elizon Tech</span>
         </div>
-        <h1 style={{ margin: '0 0 16px 0', color: '#111', fontSize: 28 }}>
-          Subscription Expired
-        </h1>
-        <p style={{ color: '#666', fontSize: 16, lineHeight: 1.6, marginBottom: 24 }}>
-          Your DomusEA admin account has been frozen due to an overdue subscription. 
-          To restore access to your property management dashboard, please renew your subscription.
-        </p>
-        <div style={{
-          background: '#f3f4f6',
-          borderRadius: 12,
-          padding: 20,
-          marginBottom: 24,
-          textAlign: 'left'
-        }}>
-          <h3 style={{ margin: '0 0 12px 0', color: '#111', fontSize: 16 }}>
-            📋 Account Details
-          </h3>
-          <div style={{ fontSize: 14, color: '#374151' }}>
-            <p style={{ margin: '8px 0' }}><strong>Name:</strong> {userProfile?.name}</p>
-            <p style={{ margin: '8px 0' }}><strong>Email:</strong> {userProfile?.email}</p>
-            <p style={{ margin: '8px 0' }}>
-              <strong>Subscription Due:</strong>{' '}
-              {userProfile?.subscription_due 
-                ? new Date(userProfile.subscription_due).toLocaleDateString('en-GB')
-                : 'Overdue'
-              }
-            </p>
-          </div>
-        </div>
-        <div style={{
-          background: '#eff6ff',
-          border: '2px solid #3b82f6',
-          borderRadius: 12,
-          padding: 20,
-          marginBottom: 24
-        }}>
-          <h3 style={{ margin: '0 0 12px 0', color: '#1e40af', fontSize: 16 }}>
-            📞 Contact to Renew
-          </h3>
-          <p style={{ margin: '0 0 12px 0', color: '#1e40af', fontSize: 14 }}>
-            Reach out to the Administrator to renew your subscription:
-          </p>
-          <div style={{ fontSize: 14, color: '#1e40af' }}>
-            <p style={{ margin: '8px 0', fontWeight: 600 }}>📱 Phone: 0711 333 436</p>
-            <p style={{ margin: '8px 0' }}>📧 Email: sa@domusea.com</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={logout} style={{ padding: '12px 24px', background: '#6b7280', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Logout</button>
-          <button onClick={() => window.location.href = 'tel:0711333436'} style={{ padding: '12px 24px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>📞 Call Now</button>
-          <button onClick={() => window.location.href = 'mailto:sa@domusea.com?subject=Subscription Renewal Request'} style={{ padding: '12px 24px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>📧 Email</button>
-        </div>
-        <p style={{ margin: '24px 0 0 0', fontSize: 12, color: '#9ca3af' }}>
-          Once your subscription is renewed, you'll regain full access to your dashboard.
-        </p>
       </div>
+      
+      <div style={expiredStyles.content}>
+        <div style={expiredStyles.card}>
+          <div style={expiredStyles.icon}>🔒</div>
+          <h1 style={expiredStyles.title}>Subscription Expired</h1>
+          <p style={expiredStyles.text}>Your admin account has been frozen due to an overdue subscription. Please renew to regain access.</p>
+          
+          <div style={expiredStyles.details}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>Account Information</div>
+            <div style={{ fontSize: '14px', color: '#6b7280', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div><strong>Admin:</strong> {userProfile?.name}</div>
+              <div><strong>Email:</strong> {userProfile?.email}</div>
+              <div><strong>Due Date:</strong> {userProfile?.subscription_due ? new Date(userProfile.subscription_due).toLocaleDateString() : 'Overdue'}</div>
+            </div>
+          </div>
+
+          <button onClick={() => window.location.href = 'tel:0711333436'} style={expiredStyles.button}>
+            <span>📞 Call Now</span>
+          </button>
+          <button onClick={logout} style={expiredStyles.secondaryButton}>Logout</button>
+        </div>
+      </div>
+
       <Footer />
     </div>
   );
@@ -571,11 +432,13 @@ const AppContent = () => {
           role={userProfile.role} 
           user={userProfile} 
         />
-        <main className="main" style={{ flex: 1, overflowY: 'auto', paddingBottom: '20px' }}>
-          <DashboardContent activePage={activePage} role={userProfile.role} userProfile={userProfile} />
-        </main>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <main className="main" style={{ flex: 1, overflowY: 'auto' }}>
+            <DashboardContent activePage={activePage} role={userProfile.role} userProfile={userProfile} />
+          </main>
+          <Footer />
+        </div>
       </div>
-      <Footer />
     </div>
   );
 };
