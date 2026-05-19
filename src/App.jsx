@@ -30,7 +30,7 @@ import AddPropertyForm from './components/AddPropertyForm';
 import PropertyModeration from './components/PropertyModeration';
 
 // --- LOGIN SCREEN WITH FROZEN HANDLING ---
-const LoginScreen = () => {
+const LoginScreen = ({ isDark }) => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
