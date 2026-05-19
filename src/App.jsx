@@ -211,16 +211,16 @@ const LoginScreen = () => {
 // --- SUBSCRIPTION EXPIRED PAGE ---
 const SubscriptionExpired = ({ userProfile, logout }) => {
   const expiredStyles = {
-    container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f3f4f6', fontFamily: "'Inter', sans-serif" },
-    topBar: { padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', background: '#ffffff' },
+    container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg, #f3f4f6)', color: 'var(--text, #111827)', fontFamily: "'Inter', sans-serif", transition: 'all 0.3s ease' },
+    topBar: { padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border, #e5e7eb)', background: 'var(--card-bg, #ffffff)' },
     content: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' },
-    card: { background: 'white', borderRadius: '16px', padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' },
+    card: { background: 'var(--card-bg, white)', borderRadius: '16px', padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border, #e5e7eb)' },
     icon: { fontSize: '48px', marginBottom: '20px' },
-    title: { fontSize: '28px', fontWeight: '700', color: '#111827', marginBottom: '16px' },
-    text: { fontSize: '15px', color: '#6b7280', lineHeight: '1.6', marginBottom: '32px' },
-    details: { background: '#f3f4f6', borderRadius: '12px', padding: '20px', textAlign: 'left', marginBottom: '24px' },
-    button: { width: '100%', padding: '16px', background: '#111827', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' },
-    secondaryButton: { width: '100%', padding: '14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }
+    title: { fontSize: '28px', fontWeight: '700', color: 'inherit', marginBottom: '16px' },
+    text: { fontSize: '15px', color: 'var(--gray, #6b7280)', lineHeight: '1.6', marginBottom: '32px' },
+    details: { background: 'var(--bg, #f3f4f6)', borderRadius: '12px', padding: '20px', textAlign: 'left', marginBottom: '24px' },
+    button: { width: '100%', padding: '16px', background: 'var(--text, #111827)', color: 'var(--bg, white)', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' },
+    secondaryButton: { width: '100%', padding: '14px', background: 'var(--bg, #f3f4f6)', color: 'inherit', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }
   };
 
   return (
