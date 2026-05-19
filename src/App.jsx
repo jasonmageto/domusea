@@ -59,7 +59,14 @@ const LoginScreen = () => {
 
   const loginStyles = {
     container: { display: 'flex', minHeight: '100vh', fontFamily: "'Inter', sans-serif" },
-    leftPanel: { flex: 1, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', position: 'relative', display: 'flex', alignItems: 'center', padding: '60px' },
+    leftPanel: { 
+      flex: 1, 
+      background: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80') center/cover no-repeat`, 
+      position: 'relative', 
+      display: 'flex', 
+      alignItems: 'center', 
+      padding: '60px' 
+    },
     overlay: { position: 'relative', zIndex: 2, maxWidth: '500px' },
     quoteContainer: { color: 'white' },
     quoteHeader: { fontSize: '12px', fontWeight: '600', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px', opacity: 0.9 },
@@ -86,7 +93,7 @@ const LoginScreen = () => {
     inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
     inputIcon: { position: 'absolute', left: '16px', fontSize: '18px', zIndex: 1, opacity: 0.5 },
     input: { width: '100%', padding: '14px 16px 14px 48px', border: '2px solid #e5e7eb', borderRadius: '12px', fontSize: '15px', outline: 'none', background: '#f9fafb', boxSizing: 'border-box' },
-    signInButton: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
+    signInButton: { width: '100%', padding: '16px', background: '#111827', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
     footer: { padding: '24px 40px', borderTop: '1px solid #e5e7eb', background: '#f9fafb', flexShrink: 0 },
     securityBadge: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', color: '#9ca3af', fontWeight: '500' }
   };
@@ -187,7 +194,7 @@ const LoginScreen = () => {
 // --- SUBSCRIPTION EXPIRED PAGE ---
 const SubscriptionExpired = ({ userProfile, logout }) => {
   const expiredStyles = {
-    container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb', fontFamily: "'Inter', sans-serif" },
+    container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f3f4f6', fontFamily: "'Inter', sans-serif" },
     topBar: { padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', background: '#ffffff' },
     content: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' },
     card: { background: 'white', borderRadius: '16px', padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' },
@@ -195,7 +202,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
     title: { fontSize: '28px', fontWeight: '700', color: '#111827', marginBottom: '16px' },
     text: { fontSize: '15px', color: '#6b7280', lineHeight: '1.6', marginBottom: '32px' },
     details: { background: '#f3f4f6', borderRadius: '12px', padding: '20px', textAlign: 'left', marginBottom: '24px' },
-    button: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' },
+    button: { width: '100%', padding: '16px', background: '#111827', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' },
     secondaryButton: { width: '100%', padding: '14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }
   };
 
