@@ -191,12 +191,50 @@ export default function SAPayments() {
     );
   }
 
+  const downloadCSV = () => {
+    const headers = ['Admin Name', 'Admin Email', 'Amount', 'Date', 'Method', 'Reference', 'Status'];
+    const rows = payments.map(p => [
+      p.admins?.name || 'Unknown',
+      p.admins?.email || 'N/A',
+      p.amount,
+      new Date(p.date).toLocaleString(),
+      p.method || 'N/A',
+      p.reference || 'N/A',
+      p.status
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `domusea_payments_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div>
       {/* Header */}
-      <div style={{marginBottom: 24}}>
-        <h2 style={{margin: 0}}>💰 SA Payments</h2>
-        <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Admin remittances to Supreme Admin</p>
+      <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div>
+          <h2 style={{margin: 0}}>💰 SA Payments</h2>
+          <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Admin remittances to Supreme Admin</p>
+        </div>
+        <button 
+          onClick={downloadCSV}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          disabled={payments.length === 0}
+        >
+          📥 Download CSV
+        </button>
       </div>
 
       {/* Stats Cards */}

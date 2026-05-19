@@ -200,12 +200,49 @@ export default function SARevenueAnalytics() {
     );
   }
 
+  const downloadRevenueCSV = () => {
+    const headers = ['Metric', 'Value'];
+    const rows = [
+      ['Total Revenue', formatCurrency(revenueData.totalRevenue)],
+      ['Average Monthly', formatCurrency(revenueData.averageMonthly)],
+      ['Growth Rate', `${revenueData.growthRate.toFixed(1)}%`],
+      ['This Month Revenue', formatCurrency(revenueData.thisMonth)],
+      ['Last Month Revenue', formatCurrency(revenueData.lastMonth)],
+      ['Confirmed Payments Count', revenueData.confirmedPayments],
+      ['Pending Payments Count', revenueData.pendingPayments]
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `domusea_revenue_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div>
       {/* Header */}
-      <div style={{marginBottom: 32}}>
-        <h1 style={{margin: 0, fontSize: 28}}>📊 Revenue Analytics</h1>
-        <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Track subscription revenue and growth trends</p>
+      <div style={{marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div>
+          <h1 style={{margin: 0, fontSize: 28}}>📊 Revenue Analytics</h1>
+          <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Track subscription revenue and growth trends</p>
+        </div>
+        <button 
+          onClick={downloadRevenueCSV}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          📥 Download Report
+        </button>
       </div>
 
       {/* Stats Grid */}
