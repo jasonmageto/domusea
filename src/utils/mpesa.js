@@ -28,7 +28,7 @@ export const getAccessToken = async () => {
 /**
  * Initiate STK Push Payment
  */
-export const initiateSTKPush = async (phoneNumber, amount, accountReference, adminId) => {
+export const initiateSTKPush = async (phoneNumber, amount, accountReference, adminId, callbackOverride = null) => {
   try {
     const accessToken = await getAccessToken();
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, -3);
@@ -50,7 +50,7 @@ export const initiateSTKPush = async (phoneNumber, amount, accountReference, adm
         PartyA: formattedPhone,
         PartyB: SHORTCODE,
         PhoneNumber: formattedPhone,
-        CallBackURL: CALLBACK_URL,
+        CallBackURL: callbackOverride || CALLBACK_URL,
         AccountReference: accountReference,
         TransactionDesc: `DomusEA Maintenance Fee - Admin ${adminId}`
       },
