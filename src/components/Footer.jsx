@@ -15,7 +15,7 @@ const Footer = () => {
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <p style={{ margin: '0 0 16px 0', fontSize: '14px', opacity: 0.8 }}>
-          © {new Date().getFullYear()} DomusEA Platform. All rights reserved.
+          © {new Date().getFullYear()} DomusEA Platform. All rights reserved. | Developed by <strong>Elizon Tech.</strong>
         </p>
         <div style={{ 
           display: 'flex', 
