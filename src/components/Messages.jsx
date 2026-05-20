@@ -209,67 +209,63 @@ export default function Messages() {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+ const handleSendMessage = async () => {
+  if (!newMessage.trim() || !selectedConversation) return;
 
-    console.log('📤 Attempting to send message to:', selectedConversation.userName);
-    setSending(true);
-    try {
-      // Determine admin_id and tenant_id for consistency with other parts of the app
-      let admin_id = null;
-      let tenant_id = null;
+  console.log('📤 Sending message to:', selectedConversation.userName);
+  setSending(true);
+  
+  try {
+    // Simplified payload - only required + essential fields
+    const payload = {
+      from_id: userProfile.id,
+      from_name: userProfile.name || 'User',
+      from_email: userProfile.email || null,
+      to_id: selectedConversation.otherUserId,
+      to_name: selectedConversation.userName || 'User',
+      to_email: selectedConversation.userEmail || null,
+      admin_id: userProfile.role === 'admin' ? userProfile.id : 
+                userProfile.role === 'sa' ? selectedConversation.otherUserId : null,
+      tenant_id: userProfile.role === 'tenant' ? userProfile.id : 
+                 userProfile.role === 'sa' ? selectedConversation.otherUserId : null,
+      message: newMessage.trim(),
+      date: new Date().toISOString(),
+      read: false
+      // Removed 'subject' for now - add back if needed
+    };
 
-      if (userProfile.role === 'admin') {
-        admin_id = userProfile.id;
-        tenant_id = selectedConversation.otherUserId;
-      } else if (userProfile.role === 'tenant') {
-        admin_id = userProfile.admin_id;
-        tenant_id = userProfile.id;
-      } else if (userProfile.role === 'sa') {
-        admin_id = selectedConversation.otherUserId; 
-      }
+    console.log('📦 Insert payload:', payload);
 
-      const payload = {
-        from_id: userProfile.id,
-        from_name: userProfile.name,
-        from_email: userProfile.email,
-        to_id: selectedConversation.otherUserId,
-        to_name: selectedConversation.userName,
-        to_email: selectedConversation.userEmail,
-        admin_id: admin_id,
-        tenant_id: tenant_id,
-        subject: 'Direct Message',
-        message: newMessage,
-        date: new Date().toISOString(),
-        read: false
-      };
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([payload])
+      .select(); // Always select to get the inserted row back
 
-      console.log('📦 Message payload:', payload);
-
-      const { data, error } = await supabase
-        .from('messages')
-        .insert([payload])
-        .select();
-
-      if (error) {
-        console.error('❌ Supabase Insert Error:', error);
-        throw error;
-      }
-      
-      console.log('✅ Message sent successfully:', data);
-      toast.success('Message sent!');
-      setNewMessage('');
-      
-      // Refresh local UI immediately
-      setMessages(prev => [...prev, data[0]]);
-      loadConversations();
-    } catch (err) {
-      console.error('❌ Send message exception:', err);
-      toast.error('Failed to send message: ' + (err.message || 'Unknown error'));
-    } finally {
-      setSending(false);
+    if (error) {
+      console.error('❌ Supabase Error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      throw error;
     }
-  };
+    
+    console.log('✅ Message sent:', data[0]);
+    toast.success('Message sent!');
+    setNewMessage('');
+    
+    // Update local state immediately
+    setMessages(prev => [...prev, data[0]]);
+    loadConversations();
+    
+  } catch (err) {
+    console.error('❌ Send failed:', err);
+    toast.error('Failed to send: ' + (err.message || 'Unknown error'));
+  } finally {
+    setSending(false);
+  }
+};
 
   const startNewConversation = async (recipientId, recipientName, recipientEmail) => {
     setSelectedConversation({
@@ -457,12 +453,12 @@ export default function Messages() {
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
+             onKeyDown={(e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSendMessage();
+  }
+}}
               placeholder="Write your professional message..."
               rows={1}
               style={{
