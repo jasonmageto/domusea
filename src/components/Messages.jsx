@@ -100,27 +100,36 @@ export default function Messages() {
     if (!selectedConversation) return;
     
     try {
+      // Use a simpler OR query to avoid complex 'and' nesting that might cause 400 errors
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .or(
-          `and(from_id.eq.${userProfile.id},to_id.eq.${selectedConversation.otherUserId}),` +
-          `and(from_id.eq.${selectedConversation.otherUserId},to_id.eq.${userProfile.id})`
-        )
+        .or(`from_id.eq.${userProfile.id},to_id.eq.${userProfile.id}`)
         .order('date', { ascending: true });
 
       if (error) throw error;
 
-      const unreadMessages = data?.filter(m => m.to_id === userProfile.id && !m.read) || [];
-      if (unreadMessages.length > 0) {
-        await Promise.all(
-          unreadMessages.map(m => 
-            supabase.from('messages').update({ read: true }).eq('id', m.id)
-          )
-        );
+      // Filter locally for the specific conversation
+      const filteredMessages = data?.filter(m => 
+        (m.from_id === userProfile.id && m.to_id === selectedConversation.otherUserId) ||
+        (m.from_id === selectedConversation.otherUserId && m.to_id === userProfile.id)
+      ) || [];
+
+      // Mark unread messages as read in a single batch update to prevent throttling/errors
+      const unreadIds = filteredMessages
+        .filter(m => m.to_id === userProfile.id && !m.read)
+        .map(m => m.id);
+
+      if (unreadIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from('messages')
+          .update({ read: true })
+          .in('id', unreadIds);
+        
+        if (updateError) console.error('⚠️ Error marking messages as read:', updateError);
       }
 
-      setMessages(data || []);
+      setMessages(filteredMessages);
     } catch (err) {
       console.error('❌ Error loading messages:', err);
     }
@@ -203,6 +212,7 @@ export default function Messages() {
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
 
+    console.log('📤 Attempting to send message to:', selectedConversation.userName);
     setSending(true);
     try {
       // Determine admin_id and tenant_id for consistency with other parts of the app
@@ -211,17 +221,15 @@ export default function Messages() {
 
       if (userProfile.role === 'admin') {
         admin_id = userProfile.id;
-        tenant_id = selectedConversation.otherUserId; // Recipient is tenant
+        tenant_id = selectedConversation.otherUserId;
       } else if (userProfile.role === 'tenant') {
         admin_id = userProfile.admin_id;
         tenant_id = userProfile.id;
       } else if (userProfile.role === 'sa') {
-        // For SA, we might need to resolve based on recipient
-        // But let's at least ensure names are correct
         admin_id = selectedConversation.otherUserId; 
       }
 
-      const { error } = await supabase.from('messages').insert([{
+      const payload = {
         from_id: userProfile.id,
         from_name: userProfile.name,
         from_email: userProfile.email,
@@ -230,20 +238,34 @@ export default function Messages() {
         to_email: selectedConversation.userEmail,
         admin_id: admin_id,
         tenant_id: tenant_id,
-        subject: 'Message',
+        subject: 'Direct Message',
         message: newMessage,
         date: new Date().toISOString(),
         read: false
-      }]);
+      };
 
-      if (error) throw error;
+      console.log('📦 Message payload:', payload);
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([payload])
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase Insert Error:', error);
+        throw error;
+      }
       
+      console.log('✅ Message sent successfully:', data);
       toast.success('Message sent!');
       setNewMessage('');
-      loadMessagesForConversation();
+      
+      // Refresh local UI immediately
+      setMessages(prev => [...prev, data[0]]);
       loadConversations();
     } catch (err) {
-      toast.error('Failed to send message');
+      console.error('❌ Send message exception:', err);
+      toast.error('Failed to send message: ' + (err.message || 'Unknown error'));
     } finally {
       setSending(false);
     }
