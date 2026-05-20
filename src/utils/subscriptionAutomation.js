@@ -118,8 +118,7 @@ export async function unfreezeAdminAndTenants(adminId) {
         frozen: false,
         frozen_reason: null
       })
-      .eq('admin_id', adminId)
-      .eq('frozen_reason', `Admin subscription overdue%`); // Only unfreeze those frozen by us
+      .eq('admin_id', adminId);
     
     if (tenantsError) throw tenantsError;
 
