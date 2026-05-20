@@ -79,9 +79,47 @@ export default function AdminPaymentsManager() {
 
   if (loading) return <div className="card" style={{textAlign: 'center', padding: '40px'}}>Loading payments...</div>;
 
+  const downloadCSV = () => {
+    const headers = ['Tenant', 'House', 'Amount', 'Date', 'Method', 'Reference', 'Status'];
+    const rows = payments.map(p => [
+      p.tenants?.name || 'Unknown',
+      p.tenants?.house || '-',
+      p.amount,
+      new Date(p.date).toLocaleString(),
+      p.method || 'N/A',
+      p.reference || 'N/A',
+      p.status
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `tenant_payments_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div>
-      <h2 style={{marginBottom: 24}}>Payment Management</h2>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24}}>
+        <h2 style={{margin: 0}}>Payment Management</h2>
+        <button 
+          onClick={downloadCSV}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          disabled={payments.length === 0}
+        >
+          📥 Download CSV
+        </button>
+      </div>
 
       <div className="grid" style={{marginBottom: 24}}>
         <div className="card">

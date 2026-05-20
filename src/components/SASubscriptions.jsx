@@ -162,24 +162,35 @@ export default function SASubscriptions() {
       return;
     }
 
+    setProcessingId(admin.id);
     try {
-      const { error } = await supabase
-        .from('admins')
-        .update({ 
-          frozen: !admin.frozen,
-          frozen_at: admin.frozen ? null : new Date().toISOString(),
-          frozen_by: admin.frozen ? null : userProfile?.id
-        })
-        .eq('id', admin.id);
+      if (admin.frozen) {
+        // Use the utility for a clean unfreeze
+        const result = await unfreezeAdminAndTenants(admin.id);
+        if (!result.success) throw new Error(result.error);
+      } else {
+        // Freeze logic
+        const { error: adminError } = await supabase
+          .from('admins')
+          .update({ 
+            frozen: true,
+            frozen_at: new Date().toISOString(),
+            frozen_by: userProfile?.id
+          })
+          .eq('id', admin.id);
 
-      if (error) throw error;
+        if (adminError) throw adminError;
 
-      // If freezing, also freeze all tenants
-      if (!admin.frozen) {
-        await supabase
+        // Freeze all tenants
+        const { error: tenantsError } = await supabase
           .from('tenants')
-          .update({ frozen: true })
+          .update({ 
+            frozen: true,
+            frozen_reason: `Admin account frozen by Supreme Admin`
+          })
           .eq('admin_id', admin.id);
+        
+        if (tenantsError) console.error('Error freezing tenants:', tenantsError);
       }
 
       // Log activity
@@ -189,13 +200,15 @@ export default function SASubscriptions() {
           type: admin.frozen ? 'admin_unfrozen' : 'admin_frozen',
           message: `Supreme Admin ${admin.frozen ? 'unfroze' : 'froze'} account for ${admin.name}`,
           admin_id: admin.id
-        });
+        }).catch(() => {});
 
       await fetchSubscriptions();
       alert(`✅ Admin ${admin.frozen ? 'unfrozen' : 'frozen'} successfully!`);
     } catch (error) {
       console.error('Error updating admin status:', error);
-      alert(`Failed to ${action.toLowerCase()} admin: ${error.message}`);
+      alert(`❌ Failed to ${action.toLowerCase()} admin: ${error.message}`);
+    } finally {
+      setProcessingId(null);
     }
   };
 
