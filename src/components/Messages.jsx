@@ -136,7 +136,7 @@ export default function Messages() {
       if (userProfile?.role === 'sa') {
         console.log('📡 SA fetching all admins...');
         
-        const {  allAdmins, error: adminsError } = await supabase
+        const { data: allAdmins, error: adminsError } = await supabase
           .from('admins')
           .select('id, name, email');
         
@@ -144,63 +144,47 @@ export default function Messages() {
           console.error('❌ Admins fetch error:', adminsError);
           toast.error('Failed to load admins: ' + adminsError.message);
         } else {
-          console.log('✅ Raw admins response:', allAdmins);
           filteredAdmins = (allAdmins || []).filter(a => a.id !== userProfile.id);
-          console.log('✅ SA found admins (excluding self):', filteredAdmins.length, filteredAdmins);
         }
         
-        console.log('📡 SA fetching all tenants...');
-        const {  allTenants, error: tenantsError } = await supabase
+        const { data: allTenants, error: tenantsError } = await supabase
           .from('tenants')
           .select('id, name, email, house, property');
         
         if (tenantsError) {
           console.error('❌ Tenants fetch error:', tenantsError);
         } else {
-          console.log('✅ SA found tenants:', allTenants?.length || 0);
           filteredTenants = allTenants || [];
         }
         
       } else if (userProfile?.role === 'admin') {
-        console.log('📡 Admin fetching self...');
-        const {  selfAdmin, error } = await supabase
+        const { data: selfAdmin, error } = await supabase
           .from('admins')
           .select('id, name, email')
           .eq('id', userProfile.id)
           .single();
         
-        if (error) {
-          console.error('❌ Error fetching self:', error);
-        } else {
-          console.log('✅ Admin found self:', selfAdmin);
+        if (!error) {
           filteredAdmins = selfAdmin ? [selfAdmin] : [];
         }
         
-        console.log('📡 Admin fetching tenants...');
-        const {  myTenants, error: tErr } = await supabase
+        const { data: myTenants, error: tErr } = await supabase
           .from('tenants')
           .select('id, name, email, house, property')
           .eq('admin_id', userProfile.id);
         
-        if (tErr) {
-          console.error('❌ Error fetching tenants:', tErr);
-        } else {
-          console.log('✅ Admin found tenants:', myTenants?.length || 0);
+        if (!tErr) {
           filteredTenants = myTenants || [];
         }
         
       } else if (userProfile?.role === 'tenant') {
-        console.log('📡 Tenant fetching admin...');
-        const {  adminData, error } = await supabase
+        const { data: adminData, error } = await supabase
           .from('admins')
           .select('id, name, email')
           .eq('id', userProfile.admin_id)
           .single();
         
-        if (error) {
-          console.error('❌ Error fetching admin:', error);
-        } else {
-          console.log('✅ Tenant found admin:', adminData);
+        if (!error) {
           filteredAdmins = adminData ? [adminData] : [];
         }
       }
@@ -221,12 +205,31 @@ export default function Messages() {
 
     setSending(true);
     try {
+      // Determine admin_id and tenant_id for consistency with other parts of the app
+      let admin_id = null;
+      let tenant_id = null;
+
+      if (userProfile.role === 'admin') {
+        admin_id = userProfile.id;
+        tenant_id = selectedConversation.otherUserId; // Recipient is tenant
+      } else if (userProfile.role === 'tenant') {
+        admin_id = userProfile.admin_id;
+        tenant_id = userProfile.id;
+      } else if (userProfile.role === 'sa') {
+        // For SA, we might need to resolve based on recipient
+        // But let's at least ensure names are correct
+        admin_id = selectedConversation.otherUserId; 
+      }
+
       const { error } = await supabase.from('messages').insert([{
         from_id: userProfile.id,
         from_name: userProfile.name,
         from_email: userProfile.email,
         to_id: selectedConversation.otherUserId,
+        to_name: selectedConversation.userName,
         to_email: selectedConversation.userEmail,
+        admin_id: admin_id,
+        tenant_id: tenant_id,
         subject: 'Message',
         message: newMessage,
         date: new Date().toISOString(),
@@ -279,53 +282,73 @@ export default function Messages() {
       <div key="chat-view" style={{
         display: 'flex',
         flexDirection: 'column',
-        height: 'calc(100vh - 100px)',
+        height: 'calc(100vh - 120px)',
         background: isDarkMode ? '#0f172a' : '#f8fafc',
-        borderRadius: 12,
-        overflow: 'hidden'
+        borderRadius: 16,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`
       }}>
         <div style={{
-          padding: '16px 20px',
+          padding: '12px 20px',
           background: isDarkMode ? '#1e293b' : 'white',
           borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
           display: 'flex',
           alignItems: 'center',
-          gap: 12
+          justifyContent: 'space-between',
+          zIndex: 10
         }}>
-          <button 
-            onClick={() => setSelectedConversation(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 24,
-              cursor: 'pointer',
-              color: isDarkMode ? '#f1f5f9' : '#1e293b',
-              padding: 0
-            }}
-          >
-            ←
-          </button>
-          <div style={{
-            width: 40,
-            height: 40,
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: 16
-          }}>
-            {(selectedConversation.userName || 'U').charAt(0).toUpperCase()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button 
+              onClick={() => setSelectedConversation(null)}
+              style={{
+                background: isDarkMode ? '#334155' : '#f1f5f9',
+                border: 'none',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                cursor: 'pointer',
+                color: isDarkMode ? '#f1f5f9' : '#1e293b',
+                transition: 'all 0.2s'
+              }}
+            >
+              ←
+            </button>
+            <div style={{
+              width: 40,
+              height: 40,
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: 16,
+              boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+            }}>
+              {(selectedConversation.userName || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 16, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
+                {selectedConversation.userName}
+              </div>
+              <div style={{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, background: '#10b981', borderRadius: '50%' }}></span>
+                Active Stakeholder
+              </div>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
-              {selectedConversation.userName}
-            </div>
-            <div style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-              {selectedConversation.userEmail}
-            </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+             <button 
+               onClick={loadMessagesForConversation}
+               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, opacity: 0.7 }}
+               title="Refresh Chat"
+             >🔄</button>
           </div>
         </div>
 
@@ -405,51 +428,71 @@ export default function Messages() {
           background: isDarkMode ? '#1e293b' : 'white',
           borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
           display: 'flex',
-          gap: 12,
-          alignItems: 'flex-end'
+          flexDirection: 'column',
+          gap: 10
         }}>
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            placeholder="Type a message..."
-            rows={1}
-            style={{
-              flex: 1,
-              padding: '12px 16px',
-              background: isDarkMode ? '#334155' : '#f1f5f9',
-              border: 'none',
-              borderRadius: 20,
-              fontSize: 15,
-              resize: 'none',
-              maxHeight: 100,
-              outline: 'none',
-              color: isDarkMode ? '#f1f5f9' : '#1e293b',
-              fontFamily: 'inherit'
-            }}
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={sending || !newMessage.trim()}
-            style={{
-              padding: '12px 24px',
-              background: newMessage.trim() ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : '#94a3b8',
-              color: 'white',
-              border: 'none',
-              borderRadius: 20,
-              fontWeight: 600,
-              cursor: newMessage.trim() ? 'pointer' : 'not-allowed',
-              opacity: newMessage.trim() ? 1 : 0.6,
-              transition: 'all 0.2s'
-            }}
-          >
-            Send
-          </button>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="Write your professional message..."
+              rows={1}
+              style={{
+                flex: 1,
+                padding: '12px 18px',
+                background: isDarkMode ? '#334155' : '#f8fafc',
+                border: `1px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                borderRadius: 24,
+                fontSize: 15,
+                resize: 'none',
+                maxHeight: 120,
+                outline: 'none',
+                color: isDarkMode ? '#f1f5f9' : '#1e293b',
+                fontFamily: 'inherit',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+              onBlur={(e) => e.target.style.borderColor = isDarkMode ? '#475569' : '#e2e8f0'}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={sending || !newMessage.trim()}
+              style={{
+                width: 48,
+                height: 48,
+                background: newMessage.trim() ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: newMessage.trim() ? 'pointer' : 'not-allowed',
+                boxShadow: newMessage.trim() ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                transition: 'all 0.2s'
+              }}
+              title="Send Message"
+            >
+              {sending ? (
+                <span className="animate-spin">⏳</span>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              )}
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: isDarkMode ? '#64748b' : '#94a3b8', display: 'flex', justifyContent: 'space-between', padding: '0 10px' }}>
+            <span>Press Enter to send, Shift+Enter for new line</span>
+            <span>Secure Stakeholder Communication</span>
+          </div>
         </div>
 
         <style>{`
