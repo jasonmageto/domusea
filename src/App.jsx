@@ -497,13 +497,13 @@ function App() {
       />
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Mobile Top Header */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-[100] flex items-center justify-between px-4 shadow-sm backdrop-blur-md bg-opacity-95">
+        {/* Mobile Top Header - Cleaned up */}
+        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-[100] flex items-center justify-between px-6 shadow-sm backdrop-blur-md bg-opacity-95">
           <div className="flex items-center gap-2">
             <span className="text-xl">🏠</span>
             <span className="font-extrabold text-lg tracking-tight text-[var(--blue)]">DomusEA</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button 
               className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-xl transition-all active:scale-90"
               onClick={() => setIsDark(!isDark)}
@@ -511,7 +511,7 @@ function App() {
               <span style={{fontSize: '18px'}}>{isDark ? '☀️' : '🌙'}</span>
             </button>
             <button 
-              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 ${isMenuOpen ? 'bg-[var(--blue)] text-white' : 'bg-[var(--bg)]'}`}
+              className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all active:scale-90 ${isMenuOpen ? 'bg-[var(--blue)] text-white shadow-lg' : 'bg-[var(--bg)]'}`}
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               <span style={{fontSize: '24px'}}>{isMenuOpen ? '✕' : '☰'}</span>
@@ -519,43 +519,50 @@ function App() {
           </div>
         </div>
 
-        {/* Mobile Dropdown Menu - POP DOWN FROM TOP */}
+        {/* Mobile Floating Dropdown Menu */}
         {isMenuOpen && (
-          <div className="md:hidden fixed top-16 left-0 right-0 z-[90] animate-in fade-in slide-in-from-top-4 duration-200">
-            {/* Backdrop blur for background */}
-            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm -z-10 h-screen" onClick={() => setIsMenuOpen(false)} />
+          <div className="md:hidden fixed top-20 left-4 right-4 z-[110] animate-in fade-in zoom-in-95 slide-in-from-top-4 duration-300">
+            {/* Backdrop for focus */}
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-md -z-10" onClick={() => setIsMenuOpen(false)} />
             
-            {/* Menu Card */}
-            <div className="bg-[var(--card)] border-b border-[var(--border)] shadow-2xl max-h-[80vh] overflow-y-auto p-4 grid grid-cols-2 gap-3 rounded-b-3xl">
-              {currentMenu.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setIsMenuOpen(false);
-                  }}
-                  className={`
-                    flex flex-col items-center justify-center p-4 rounded-2xl transition-all border
-                    ${activeTab === item.id 
-                      ? 'bg-[var(--blue)] text-white border-[var(--blue)] shadow-lg scale-95' 
-                      : 'bg-[var(--bg)] text-[var(--gray)] border-transparent hover:border-[var(--border)]'}
-                  `}
-                >
-                  <span className="text-2xl mb-2">{item.icon}</span>
-                  <span className="text-xs font-bold text-center leading-tight">{item.label}</span>
-                </button>
-              ))}
+            {/* Floating Menu Card */}
+            <div className="bg-[var(--card)] border border-[var(--border)] shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-5 rounded-[2.5rem] overflow-hidden">
+              <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                {currentMenu.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setIsMenuOpen(false);
+                    }}
+                    className={`
+                      flex flex-col items-center justify-center p-5 rounded-[2rem] transition-all border-2
+                      ${activeTab === item.id 
+                        ? 'bg-gradient-to-br from-[var(--blue)] to-[#4f46e5] text-white border-transparent shadow-xl scale-95' 
+                        : 'bg-[var(--bg)] text-[var(--gray)] border-transparent hover:border-[var(--border)] shadow-sm'}
+                    `}
+                  >
+                    <span className="text-3xl mb-2">{item.icon}</span>
+                    <span className="text-[11px] font-extrabold text-center uppercase tracking-wider">{item.label}</span>
+                  </button>
+                ))}
+              </div>
               
-              {/* Profile Info in Menu */}
-              <div className="col-span-2 mt-2 p-4 bg-[var(--bg)] rounded-2xl flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[var(--blue)] flex items-center justify-center text-white font-bold">
+              {/* Profile Section in Menu */}
+              <div className="mt-6 p-5 bg-gradient-to-r from-[var(--bg)] to-[var(--card)] rounded-[2rem] flex items-center gap-4 border border-[var(--border)]">
+                <div className="w-12 h-12 rounded-2xl bg-[var(--blue)] flex items-center justify-center text-white text-xl font-black shadow-lg">
                   {userProfile?.name?.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm truncate">{userProfile?.name}</div>
-                  <div className="text-[10px] uppercase opacity-70 font-semibold">{userProfile?.role?.replace('_', ' ')}</div>
+                  <div className="font-black text-sm truncate text-[var(--text)]">{userProfile?.name}</div>
+                  <div className="text-[10px] uppercase font-bold text-[var(--blue)] tracking-widest">{userProfile?.role?.replace('_', ' ')}</div>
                 </div>
-                <button onClick={logout} className="px-3 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-100">Logout</button>
+                <button 
+                  onClick={logout} 
+                  className="px-4 py-2 bg-red-500 text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-red-500/30 active:scale-95 transition-all"
+                >
+                  Exit
+                </button>
               </div>
             </div>
           </div>
