@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/(manifest.json|sw.js|favicon.svg|icon-512.png|icons.svg|image.png)",
+      "destination": "/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
