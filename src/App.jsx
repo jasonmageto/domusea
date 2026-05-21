@@ -292,7 +292,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
 };
 
 // --- SIDEBAR COMPONENT ---
-const Sidebar = ({ userProfile, activeTab, setActiveTab, isSidebarOpen, setIsSidebarOpen, isDark, setIsDark }) => {
+const Sidebar = ({ userProfile, activeTab, setActiveTab, isDark, setIsDark }) => {
   const menuItems = {
     supreme_admin: [
       { id: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -330,115 +330,48 @@ const Sidebar = ({ userProfile, activeTab, setActiveTab, isSidebarOpen, setIsSid
   const currentMenu = menuItems[userProfile?.role] || [];
 
   return (
-    <>
-      {/* Desktop Sidebar - Always Visible on Desktop */}
-      <aside className="hidden md:flex md:flex-col md:w-72 bg-[var(--card)] border-r border-[var(--border)] h-screen">
-        <div className="p-6 border-b border-[var(--border)]">
-          <div className="text-xl font-extrabold text-[var(--blue)] tracking-tight">🏠 DomusEA</div>
-        </div>
+    <aside className="hidden md:flex md:flex-col md:w-72 bg-[var(--card)] border-r border-[var(--border)] h-screen">
+      <div className="p-6 border-b border-[var(--border)]">
+        <div className="text-xl font-extrabold text-[var(--blue)] tracking-tight">🏠 DomusEA</div>
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {currentMenu.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`
-                w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
-                ${activeTab === item.id 
-                  ? 'bg-[var(--blue)] text-white shadow-lg' 
-                  : 'hover:bg-[var(--bg)] text-[var(--gray)]'}
-              `}
-            >
-              <span className="text-xl">{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="p-4 border-t border-[var(--border)] space-y-2">
-          <button 
-            onClick={() => setIsDark(!isDark)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[var(--bg)] text-[var(--gray)] transition-all"
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {currentMenu.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`
+              w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+              ${activeTab === item.id 
+                ? 'bg-[var(--blue)] text-white shadow-lg' 
+                : 'hover:bg-[var(--bg)] text-[var(--gray)]'}
+            `}
           >
-            <span>{isDark ? '☀️' : '🌙'}</span>
-            <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+            <span className="text-xl">{item.icon}</span>
+            <span className="font-medium">{item.label}</span>
           </button>
-          <div className="flex items-center gap-3 px-4 py-3 text-[var(--gray)]">
-            <div className="w-8 h-8 rounded-full bg-[var(--blue)] flex items-center justify-center text-white font-bold">
-              {userProfile?.name?.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold truncate">{userProfile?.name}</div>
-              <div className="text-xs truncate opacity-70 uppercase">{userProfile?.role?.replace('_', ' ')}</div>
-            </div>
+        ))}
+      </div>
+
+      <div className="p-4 border-t border-[var(--border)] space-y-2">
+        <button 
+          onClick={() => setIsDark(!isDark)}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[var(--bg)] text-[var(--gray)] transition-all"
+        >
+          <span>{isDark ? '☀️' : '🌙'}</span>
+          <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
+        <div className="flex items-center gap-3 px-4 py-3 text-[var(--gray)]">
+          <div className="w-8 h-8 rounded-full bg-[var(--blue)] flex items-center justify-center text-white font-bold">
+            {userProfile?.name?.charAt(0)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold truncate">{userProfile?.name}</div>
+            <div className="text-xs truncate opacity-70 uppercase">{userProfile?.role?.replace('_', ' ')}</div>
           </div>
         </div>
-      </aside>
-
-      {/* Mobile Overlay - Full Screen Popup */}
-      {isSidebarOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] transition-opacity duration-300"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-          
-          {/* Mobile Sidebar - Slides from Left */}
-          <aside className="md:hidden fixed inset-y-0 left-0 z-[100] w-72 bg-[var(--card)] shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
-              <div className="text-xl font-extrabold text-[var(--blue)] tracking-tight">🏠 DomusEA</div>
-              <button 
-                className="w-8 h-8 flex items-center justify-center hover:bg-[var(--bg)] rounded-full transition-colors" 
-                onClick={() => setIsSidebarOpen(false)}
-              >
-                <span style={{fontSize: '20px'}}>✕</span>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {currentMenu.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setIsSidebarOpen(false);
-                  }}
-                  className={`
-                    w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
-                    ${activeTab === item.id 
-                      ? 'bg-[var(--blue)] text-white shadow-lg' 
-                      : 'hover:bg-[var(--bg)] text-[var(--gray)]'}
-                  `}
-                >
-                  <span className="text-xl">{item.icon}</span>
-                  <span className="font-medium">{item.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="p-4 border-t border-[var(--border)] space-y-2">
-              <button 
-                onClick={() => setIsDark(!isDark)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[var(--bg)] text-[var(--gray)] transition-all"
-              >
-                <span>{isDark ? '☀️' : '🌙'}</span>
-                <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
-              </button>
-              <div className="flex items-center gap-3 px-4 py-3 text-[var(--gray)]">
-                <div className="w-8 h-8 rounded-full bg-[var(--blue)] flex items-center justify-center text-white font-bold">
-                  {userProfile?.name?.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold truncate">{userProfile?.name}</div>
-                  <div className="text-xs truncate opacity-70 uppercase">{userProfile?.role?.replace('_', ' ')}</div>
-                </div>
-              </div>
-            </div>
-          </aside>
-        </>
-      )}
-    </>
+      </div>
+    </aside>
   );
 };
 
@@ -494,7 +427,7 @@ const AppContent = ({ userProfile, activeTab, setActiveTab, isDark }) => {
 function App() {
   const { userProfile, loading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -516,6 +449,42 @@ function App() {
     return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
   }
 
+  const menuItems = {
+    supreme_admin: [
+      { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+      { id: 'property-moderation', label: 'Property Moderation', icon: '🛡️' },
+      { id: 'property-map', label: 'All Properties Map', icon: '🗺️' },
+      { id: 'manage-admins', label: 'Manage Admins', icon: '👥' },
+      { id: 'sa-subscriptions', label: 'Subscriptions', icon: '💳' },
+      { id: 'sa-revenue', label: 'Revenue Analytics', icon: '📈' },
+      { id: 'sa-payments', label: 'Payments', icon: '💰' },
+      { id: 'sa-announcements', label: 'Announcements', icon: '📢' },
+      { id: 'messages', label: 'Messages', icon: '💬' }
+    ],
+    admin: [
+      { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
+      { id: 'add-property', label: 'Add Property', icon: '➕' },
+      { id: 'property-map', label: 'My Properties Map', icon: '📍' },
+      { id: 'manage-tenants', label: 'Manage Tenants', icon: '👥' },
+      { id: 'occupancy', label: 'Occupancy Grid', icon: '🏢' },
+      { id: 'payment-methods', label: 'Payment Methods', icon: '💳' },
+      { id: 'admin-payments', label: 'Payment Management', icon: '💰' },
+      { id: 'admin-revenue', label: 'Revenue Analytics', icon: '📈' },
+      { id: 'complaints', label: 'Tenant Requests', icon: '📩' },
+      { id: 'messages', label: 'Messages', icon: '💬' }
+    ],
+    tenant: [
+      { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
+      { id: 'pay-rent', label: 'Pay Rent', icon: '💳' },
+      { id: 'payment-history', label: 'Payment History', icon: '📜' },
+      { id: 'tenant-requests', label: 'Requests', icon: '📩' },
+      { id: 'messages', label: 'Messages', icon: '💬' },
+      { id: 'settings', label: 'Settings', icon: '⚙️' }
+    ]
+  };
+
+  const currentMenu = menuItems[userProfile?.role] || [];
+
   return (
     <div className={`flex min-h-screen bg-[var(--bg)] text-[var(--text)] ${isDark ? 'dark' : ''}`}>
       {/* Desktop Sidebar */}
@@ -523,31 +492,74 @@ function App() {
         userProfile={userProfile} 
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
         isDark={isDark}
         setIsDark={setIsDark}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile Header - Only on Mobile */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[var(--card)] border-b border-[var(--border)] z-[80] flex items-center justify-between px-4 shadow-sm">
-          <button 
-            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-all active:scale-90"
-            onClick={() => setIsSidebarOpen(true)}
-            aria-label="Open Menu"
-          >
-            <span style={{fontSize: '24px'}}>☰</span>
-          </button>
-          <div className="font-extrabold text-lg tracking-tight text-[var(--blue)]">DomusEA</div>
-          <button 
-            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-all active:scale-90"
-            onClick={() => setIsDark(!isDark)}
-            aria-label="Toggle Theme"
-          >
-            <span style={{fontSize: '18px'}}>{isDark ? '☀️' : '🌙'}</span>
-          </button>
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* Mobile Top Header */}
+        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-[100] flex items-center justify-between px-4 shadow-sm backdrop-blur-md bg-opacity-95">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🏠</span>
+            <span className="font-extrabold text-lg tracking-tight text-[var(--blue)]">DomusEA</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-xl transition-all active:scale-90"
+              onClick={() => setIsDark(!isDark)}
+            >
+              <span style={{fontSize: '18px'}}>{isDark ? '☀️' : '🌙'}</span>
+            </button>
+            <button 
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 ${isMenuOpen ? 'bg-[var(--blue)] text-white' : 'bg-[var(--bg)]'}`}
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              <span style={{fontSize: '24px'}}>{isMenuOpen ? '✕' : '☰'}</span>
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Dropdown Menu - POP DOWN FROM TOP */}
+        {isMenuOpen && (
+          <div className="md:hidden fixed top-16 left-0 right-0 z-[90] animate-in fade-in slide-in-from-top-4 duration-200">
+            {/* Backdrop blur for background */}
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm -z-10 h-screen" onClick={() => setIsMenuOpen(false)} />
+            
+            {/* Menu Card */}
+            <div className="bg-[var(--card)] border-b border-[var(--border)] shadow-2xl max-h-[80vh] overflow-y-auto p-4 grid grid-cols-2 gap-3 rounded-b-3xl">
+              {currentMenu.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setIsMenuOpen(false);
+                  }}
+                  className={`
+                    flex flex-col items-center justify-center p-4 rounded-2xl transition-all border
+                    ${activeTab === item.id 
+                      ? 'bg-[var(--blue)] text-white border-[var(--blue)] shadow-lg scale-95' 
+                      : 'bg-[var(--bg)] text-[var(--gray)] border-transparent hover:border-[var(--border)]'}
+                  `}
+                >
+                  <span className="text-2xl mb-2">{item.icon}</span>
+                  <span className="text-xs font-bold text-center leading-tight">{item.label}</span>
+                </button>
+              ))}
+              
+              {/* Profile Info in Menu */}
+              <div className="col-span-2 mt-2 p-4 bg-[var(--bg)] rounded-2xl flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[var(--blue)] flex items-center justify-center text-white font-bold">
+                  {userProfile?.name?.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm truncate">{userProfile?.name}</div>
+                  <div className="text-[10px] uppercase opacity-70 font-semibold">{userProfile?.role?.replace('_', ' ')}</div>
+                </div>
+                <button onClick={logout} className="px-3 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-100">Logout</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 pt-20 md:pt-8">
