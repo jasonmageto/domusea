@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
+import { exportToPDF } from '../utils/pdfExport';
 
 const DEFAULT_TENANT_PASSWORD = 'tenant123';
 
@@ -15,17 +16,11 @@ export default function ManageTenants() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newTenantCredentials, setNewTenantCredentials] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active'
+  const [statusFilter, setStatusFilter] = useState('all');
   
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    property: '',
-    house: '',
-    rent: '',
-    due_date: '',
-    status: 'Active'
+    name: '', email: '', phone: '', property: '', house: '',
+    rent: '', due_date: '', status: 'Active'
   });
   const [sendingBulkReminders, setSendingBulkReminders] = useState(false);
 
@@ -33,16 +28,11 @@ export default function ManageTenants() {
     fetchTenants();
   }, []);
 
-  // 🔍 Filter tenants when search term OR status filter changes
   useEffect(() => {
     let result = [...tenants];
-    
-    // Apply status filter
     if (statusFilter === 'active') {
       result = result.filter(t => t.status?.toLowerCase() !== 'vacated');
     }
-    
-    // Then apply search filter
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
       result = result.filter(tenant => 
@@ -54,7 +44,6 @@ export default function ManageTenants() {
         tenant.status?.toLowerCase().includes(term)
       );
     }
-    
     setFilteredTenants(result);
   }, [searchTerm, statusFilter, tenants]);
 
@@ -76,47 +65,71 @@ export default function ManageTenants() {
     }
   }
 
-  const handleBulkReminders = async () => {
-    if (!window.confirm('Send rent reminders to all pending and overdue tenants?')) {
-      return;
-    }
+  const downloadCSV = () => {
+    const headers = ['Name', 'Email', 'Phone', 'Property', 'Unit', 'Rent', 'Due Date', 'Status'];
+    const rows = filteredTenants.map(t => [
+      t.name, t.email, t.phone || 'N/A', t.property || 'N/A', 
+      t.house || 'N/A', t.rent, t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A', t.status
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `tenants_list_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
 
+  const downloadPDF = () => {
+    const headers = ['Name', 'Property', 'Unit', 'Rent', 'Due Date', 'Status'];
+    const data = filteredTenants.map(t => [
+      t.name, t.property || 'N/A', t.house || 'N/A', 
+      `KSh ${parseFloat(t.rent).toLocaleString()}`,
+      t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A',
+      t.status
+    ]);
+    exportToPDF({
+      title: 'Tenants List Report',
+      filename: 'Tenants_List',
+      headers,
+      data,
+      subtitle: `Total Tenants: ${filteredTenants.length}`
+    });
+  };
+
+  const handleBulkReminders = async () => {
+    if (!window.confirm('Send rent reminders to all pending and overdue tenants?')) return;
     setSendingBulkReminders(true);
     try {
       const today = new Date();
-      const tenantsNeedingReminders = tenants.filter(tenant => {
-        if (tenant.status?.toLowerCase() === 'vacated') return false;
-        const dueDate = tenant.due_date ? new Date(tenant.due_date) : null;
-        const status = tenant.status?.toLowerCase();
-        if (status === 'overdue' || (dueDate && dueDate < today)) return true;
-        if (status === 'pending') return true;
-        return false;
+      const targets = tenants.filter(t => {
+        if (t.status?.toLowerCase() === 'vacated') return false;
+        const dueDate = t.due_date ? new Date(t.due_date) : null;
+        const s = t.status?.toLowerCase();
+        return s === 'overdue' || (dueDate && dueDate < today) || s === 'pending';
       });
 
-      if (tenantsNeedingReminders.length === 0) {
-        alert('No tenants require reminders at this time.');
+      if (targets.length === 0) {
+        alert('No tenants require reminders.');
         return;
       }
 
-      const reminders = tenantsNeedingReminders.map(tenant => ({
+      const reminders = targets.map(t => ({
         admin_id: userProfile.id,
-        tenant_id: tenant.id,
+        tenant_id: t.id,
         from_id: userProfile.id,
-        to_id: tenant.id,
+        to_id: t.id,
         from_name: userProfile.name,
         subject: 'Rent Payment Reminder',
-        message: `Dear ${tenant.name},\n\nThis is a friendly reminder that your rent of KSh ${parseInt(tenant.rent).toLocaleString()} ${tenant.due_date ? `(due: ${new Date(tenant.due_date).toLocaleDateString()})` : ''} is ${tenant.status?.toLowerCase() === 'overdue' ? 'overdue' : 'pending'}.\n\nPlease make payment at your earliest convenience.\n\nThank you.`,
+        message: `Dear ${t.name},\n\nYour rent of KSh ${parseInt(t.rent).toLocaleString()} is ${t.status?.toLowerCase()}.\n\nPlease pay promptly.`,
         date: new Date().toISOString(),
         read: false
       }));
 
       const { error } = await supabase.from('messages').insert(reminders);
       if (error) throw error;
-
-      alert(`✅ Rent reminders sent to ${tenantsNeedingReminders.length} tenant(s)`);
+      alert(`✅ Reminders sent to ${targets.length} tenants`);
     } catch (error) {
-      console.error('Error sending bulk reminders:', error);
-      alert('Failed to send reminders. Please try again.');
+      alert('Failed to send reminders.');
     } finally {
       setSendingBulkReminders(false);
     }
@@ -124,460 +137,119 @@ export default function ManageTenants() {
 
   const openAddModal = () => {
     setEditingTenant(null);
-    setFormData({
-      name: '', email: '', phone: '', property: '', house: '',
-      rent: '', due_date: '', status: 'Active'
-    });
-    setNewTenantCredentials(null);
-    setShowModal(true);
-  };
-
-  const openEditModal = (tenant) => {
-    setEditingTenant(tenant);
-    setFormData({
-      name: tenant.name || '',
-      email: tenant.email || '',
-      phone: tenant.phone || '',
-      property: tenant.property || '',
-      house: tenant.house || '',
-      rent: tenant.rent || '',
-      due_date: tenant.due_date ? tenant.due_date.split('T')[0] : '',
-      status: tenant.status || 'Active'
-    });
+    setFormData({ name: '', email: '', phone: '', property: '', house: '', rent: '', due_date: '', status: 'Active' });
     setShowModal(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setCreating(true);
-    
     try {
       if (editingTenant) {
-        const { error } = await supabase
-          .from('tenants')
-          .update({
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            property: formData.property,
-            house: formData.house,
-            rent: parseFloat(formData.rent) || 0,
-            due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
-            status: formData.status
-          })
-          .eq('id', editingTenant.id)
-          .eq('admin_id', userProfile.id);
-
+        const { error } = await supabase.from('tenants').update({
+          name: formData.name, email: formData.email, phone: formData.phone, property: formData.property,
+          house: formData.house, rent: parseFloat(formData.rent) || 0,
+          due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null, status: formData.status
+        }).eq('id', editingTenant.id);
         if (error) throw error;
-        alert('✅ Tenant updated successfully!');
-        setShowModal(false);
+        alert('✅ Updated!');
       } else {
-        const { data: adminData, error: limitError } = await supabase
-          .from('admins')
-          .select('tenant_limit')
-          .eq('id', userProfile.id)
-          .single();
-
-        if (limitError) throw limitError;
-        const tenantLimit = adminData?.tenant_limit || 50;
-        if (tenants.length >= tenantLimit) {
-          alert(`❌ Tenant limit reached! Your limit is ${tenantLimit} tenants.`);
-          setCreating(false);
-          return;
-        }
-
         const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: DEFAULT_TENANT_PASSWORD,
+          email: formData.email, password: DEFAULT_TENANT_PASSWORD,
           options: { data: { name: formData.name, role: 'tenant' } }
         });
-
-        if (authError) {
-          if (authError.message.includes('already been registered')) {
-            throw new Error('This email is already registered. Use a different email.');
-          }
-          throw authError;
-        }
-
-        if (!authData.user) throw new Error('Failed to create tenant account.');
-
-        const { data: newTenant, error: dbError } = await supabase
-          .from('tenants')
-          .insert({
-            id: authData.user.id,
-            admin_id: userProfile.id,
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            property: formData.property,
-            house: formData.house,
-            rent: parseFloat(formData.rent) || 0,
-            due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
-            status: formData.status,
-            password_changed: false
-          })
-          .select()
-          .single();
-
-        if (dbError) {
-          await supabase.auth.admin.deleteUser(authData.user.id);
-          throw dbError;
-        }
-
-        setNewTenantCredentials({ email: formData.email, password: DEFAULT_TENANT_PASSWORD, name: formData.name });
-        setShowPasswordModal(true);
-        setShowModal(false);
+        if (authError) throw authError;
+        const { error: dbError } = await supabase.from('tenants').insert({
+          id: authData.user.id, admin_id: userProfile.id, name: formData.name, email: formData.email,
+          phone: formData.phone, property: formData.property, house: formData.house,
+          rent: parseFloat(formData.rent) || 0, due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
+          status: formData.status
+        });
+        if (dbError) throw dbError;
+        alert('✅ Created!');
       }
-      await fetchTenants();
+      setShowModal(false);
+      fetchTenants();
     } catch (error) {
-      console.error('Error saving tenant:', error);
-      alert(`❌ Failed: ${error.message}`);
+      alert(`❌ Error: ${error.message}`);
     } finally {
       setCreating(false);
     }
   };
 
-  // 🔧 UPDATED: Permanently delete tenant instead of marking as vacated
-  const handleVacate = async (tenant) => {
-    const confirmed = window.confirm(
-      `⚠️ WARNING: PERMANENTLY REMOVE TENANT\n\n` +
-      `Name: ${tenant.name}\n` +
-      `Email: ${tenant.email}\n` +
-      `Property: ${tenant.property} - Unit ${tenant.house}\n\n` +
-      `This will:\n` +
-      `• Delete the tenant from the system\n` +
-      `• Remove all related data\n` +
-      `• CANNOT be undone\n\n` +
-      `Are you sure you want to proceed?`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setLoading(true);
-      
-      // Delete related records first (cascade delete)
-      const relatedTables = [
-        'payments',
-        'complaints',
-        'maintenance_requests'
-      ];
-
-      for (const table of relatedTables) {
-        await supabase
-          .from(table)
-          .delete()
-          .eq('tenant_id', tenant.id);
-      }
-
-      // Delete messages where tenant is involved
-      await supabase
-        .from('messages')
-        .delete()
-        .or(`to_id.eq.${tenant.id},from_id.eq.${tenant.id}`);
-
-      // Delete tenant auth account
-      const { error: authError } = await supabase.auth.admin.deleteUser(tenant.id);
-      if (authError) {
-        console.warn('Warning: Could not delete auth account:', authError.message);
-      }
-
-      // Finally delete tenant record
-      const { error } = await supabase
-        .from('tenants')
-        .delete()
-        .eq('id', tenant.id)
-        .eq('admin_id', userProfile.id);
-
-      if (error) throw error;
-
-      alert(`✅ ${tenant.name} has been permanently removed from the system`);
-      await fetchTenants();
-    } catch (error) {
-      console.error('Error deleting tenant:', error);
-      alert(`❌ Failed to remove tenant: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const closePasswordModal = () => {
-    setShowPasswordModal(false);
-    setNewTenantCredentials(null);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'active': case 'paid': return 'status-green';
-      case 'pending': return 'status-amber';
-      case 'overdue': return 'status-red';
-      default: return 'status-gray';
-    }
-  };
-
-  // Count stats - removed vacated count since tenants are deleted
-  const activeCount = tenants.filter(t => t.status?.toLowerCase() !== 'vacated').length;
-
-  if (loading) {
-    return (
-      <div style={{textAlign: 'center', padding: 40}}>
-        <div style={{fontSize: 24, marginBottom: 16}}>⏳</div>
-        <div>Loading tenants...</div>
-      </div>
-    );
-  }
+  if (loading) return <div style={{textAlign: 'center', padding: 40}}>Loading tenants...</div>;
 
   return (
     <div>
-      {/* Header */}
-      <div style={{
-        marginBottom: 24,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 12
-      }}>
+      <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12}}>
         <h2 style={{margin: 0}}>👥 Manage Tenants</h2>
         <div style={{display: 'flex', gap: 12}}>
-          <button 
-            onClick={handleBulkReminders}
-            disabled={sendingBulkReminders}
-            className="btn"
-            style={{
-              background: '#f59e0b', color: 'white', padding: '10px 20px',
-              opacity: sendingBulkReminders ? 0.6 : 1
-            }}
-          >
+          <button onClick={downloadCSV} className="btn" style={{background: 'var(--green)', color: 'white'}}>📊 CSV</button>
+          <button onClick={downloadPDF} className="btn" style={{background: 'var(--red)', color: 'white'}}>📄 PDF</button>
+          <button onClick={handleBulkReminders} disabled={sendingBulkReminders} className="btn" style={{background: '#f59e0b', color: 'white'}}>
             {sendingBulkReminders ? 'Sending...' : '📧 Bulk Reminders'}
           </button>
           <button onClick={openAddModal} className="btn btn-primary">+ New Tenant</button>
         </div>
       </div>
 
-      {/* 🔍 Search + Status Filter */}
       <div className="card" style={{marginBottom: 20, padding: 16}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16}}>
-          <div style={{flex: 1, position: 'relative'}}>
-            <input
-              type="text"
-              placeholder="🔍 Search by name, email, property, unit, phone, or status..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%', padding: '10px 14px', paddingLeft: 40,
-                borderRadius: 8, border: '1px solid var(--border)', fontSize: 14
-              }}
-            />
-            <span style={{position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--gray)'}}>🔍</span>
-          </div>
-          {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="btn" style={{padding: '10px 16px'}}>Clear</button>
-          )}
-        </div>
-
-        {/* Status Filter Tabs - Removed Vacated tab */}
-        <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`btn ${statusFilter === 'all' ? 'btn-primary' : ''}`}
-            style={{padding: '8px 16px'}}
-          >
-            All Tenants ({tenants.length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('active')}
-            className={`btn ${statusFilter === 'active' ? 'btn-primary' : ''}`}
-            style={{
-              padding: '8px 16px',
-              background: statusFilter === 'active' ? 'var(--green)' : undefined,
-              color: statusFilter === 'active' ? 'white' : undefined
-            }}
-          >
-            ✅ Active ({activeCount})
-          </button>
-        </div>
-
-        <div style={{marginTop: 8, fontSize: 13, color: 'var(--gray)'}}>
-          Showing <strong>{filteredTenants.length}</strong> of <strong>{tenants.length}</strong> tenants
-          {(searchTerm || statusFilter !== 'all') && ' • Filtered'}
+        <input type="text" placeholder="🔍 Search tenants..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          style={{width: '100%', padding: '10px', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 12}} />
+        <div style={{display: 'flex', gap: 8}}>
+          <button onClick={() => setStatusFilter('all')} className={`btn ${statusFilter === 'all' ? 'btn-primary' : ''}`}>All ({tenants.length})</button>
+          <button onClick={() => setStatusFilter('active')} className={`btn ${statusFilter === 'active' ? 'btn-primary' : ''}`}>Active ({tenants.filter(t => t.status !== 'Vacated').length})</button>
         </div>
       </div>
 
-      {/* Tenants Table */}
       <div className="card">
         <div style={{overflowX: 'auto'}}>
-          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse'}}>
+          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: 800}}>
             <thead>
               <tr style={{borderBottom: '2px solid var(--border)'}}>
                 <th style={{padding: '12px 8px'}}>Name</th>
-                <th style={{padding: '12px 8px'}}>Email</th>
-                <th style={{padding: '12px 8px'}}>Property</th>
-                <th style={{padding: '12px 8px'}}>Unit</th>
-                <th style={{padding: '12px 8px'}}>Rent</th>
-                <th style={{padding: '12px 8px'}}>Due Date</th>
-                <th style={{padding: '12px 8px'}}>Status</th>
-                <th style={{padding: '12px 8px'}}>Actions</th>
+                <th>Property</th>
+                <th>Unit</th>
+                <th>Rent</th>
+                <th>Due Date</th>
+                <th>Status</th>
+                <th style={{textAlign: 'center'}}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredTenants.map((tenant) => {
-                const isMatch = searchTerm && (
-                  tenant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  tenant.email?.toLowerCase().includes(searchTerm.toLowerCase())
-                );
-                
-                return (
-                  <tr key={tenant.id} style={{
-                    borderBottom: '1px solid var(--border)',
-                    background: isMatch ? 'rgba(59, 130, 246, 0.05)' : 'transparent'
-                  }}>
-                    <td style={{padding: '12px 8px', fontWeight: 600}}>{tenant.name}</td>
-                    <td style={{padding: '12px 8px', color: 'var(--gray)', fontSize: 13}}>{tenant.email}</td>
-                    <td style={{padding: '12px 8px'}}>{tenant.property}</td>
-                    <td style={{padding: '12px 8px'}}>{tenant.house}</td>
-                    <td style={{padding: '12px 8px', fontWeight: 600}}>KSh {parseInt(tenant.rent || 0).toLocaleString()}</td>
-                    <td style={{padding: '12px 8px', fontSize: 13}}>{formatDate(tenant.due_date)}</td>
-                    <td style={{padding: '12px 8px'}}>
-                      <span className={`badge ${getStatusColor(tenant.status)}`}>{tenant.status || 'Unknown'}</span>
-                    </td>
-                    <td style={{padding: '12px 8px'}}>
-                      <button onClick={() => openEditModal(tenant)} className="btn btn-sm" style={{marginRight: 8}}>✏️ Edit</button>
-                      <button 
-                        onClick={() => handleVacate(tenant)} 
-                        className="btn btn-sm" 
-                        style={{background: '#fee2e2', color: '#dc2626'}}
-                      >
-                        🗑️ Remove
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredTenants.length === 0 && (
-                <tr>
-                  <td colSpan="8" style={{padding: 40, textAlign: 'center', color: 'var(--gray)'}}>
-                    <div style={{fontSize: 32, marginBottom: 8}}>
-                      {searchTerm ? '🔍' : '👥'}
-                    </div>
-                    <div>
-                      {searchTerm 
-                        ? `No tenants found matching "${searchTerm}"`
-                        : 'No active tenants found'}
-                    </div>
-                    {searchTerm && (
-                      <button onClick={() => {setSearchTerm(''); setStatusFilter('all');}} className="btn btn-sm" style={{marginTop: 12}}>
-                        Clear Filters
-                      </button>
-                    )}
+              {filteredTenants.map(t => (
+                <tr key={t.id} style={{borderBottom: '1px solid var(--border)'}}>
+                  <td style={{padding: '12px 8px'}}>{t.name}</td>
+                  <td>{t.property || 'N/A'}</td>
+                  <td>{t.house || 'N/A'}</td>
+                  <td style={{fontWeight: 600}}>KSh {t.rent?.toLocaleString()}</td>
+                  <td>{t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A'}</td>
+                  <td><span className={`badge ${t.status === 'Active' ? 'status-green' : 'status-amber'}`}>{t.status}</span></td>
+                  <td style={{textAlign: 'center'}}>
+                    <button onClick={() => { setEditingTenant(t); setFormData(t); setShowModal(true); }} className="btn btn-sm" style={{marginRight: 8}}>Edit</button>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
       {showModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 1000, padding: 20
-        }}>
-          <div className="card" style={{maxWidth: 600, width: '100%', maxHeight: '90vh', overflow: 'auto', background: 'white'}}>
-            <h3 style={{marginTop: 0}}>{editingTenant ? 'Edit Tenant' : 'Add New Tenant'}</h3>
+        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
+          <div className="card" style={{width: '100%', maxWidth: 500}}>
+            <h3>{editingTenant ? 'Edit Tenant' : 'Add New Tenant'}</h3>
             <form onSubmit={handleSubmit}>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16}}>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Name *</label>
-                  <input type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}} />
-                </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Email *</label>
-                  <input type="email" required value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}} />
-                </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Phone</label>
-                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}} />
-                </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Property *</label>
-                  <input type="text" required value={formData.property} onChange={(e) => setFormData({...formData, property: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}} />
-                </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Unit/House *</label>
-                  <input type="text" required value={formData.house} onChange={(e) => setFormData({...formData, house: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}} />
-                </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Rent (KSh) *</label>
-                  <input type="number" required min="0" value={formData.rent} onChange={(e) => setFormData({...formData, rent: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}} />
-                </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Due Date</label>
-                  <input type="date" value={formData.due_date} onChange={(e) => setFormData({...formData, due_date: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}} />
-                </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600}}>Status</label>
-                  <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 14}}>
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Overdue">Overdue</option>
-                  </select>
-                </div>
-              </div>
+              <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required style={{width: '100%', marginBottom: 12, padding: 10}} />
+              <input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required style={{width: '100%', marginBottom: 12, padding: 10}} />
+              <input type="text" placeholder="Property" value={formData.property} onChange={e => setFormData({...formData, property: e.target.value})} style={{width: '100%', marginBottom: 12, padding: 10}} />
+              <input type="text" placeholder="House/Unit" value={formData.house} onChange={e => setFormData({...formData, house: e.target.value})} style={{width: '100%', marginBottom: 12, padding: 10}} />
+              <input type="number" placeholder="Rent" value={formData.rent} onChange={e => setFormData({...formData, rent: e.target.value})} required style={{width: '100%', marginBottom: 12, padding: 10}} />
               <div style={{display: 'flex', gap: 12, justifyContent: 'flex-end'}}>
-                <button type="button" onClick={() => setShowModal(false)} className="btn" disabled={creating}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={creating}>
-                  {creating ? 'Creating...' : (editingTenant ? 'Update Tenant' : 'Create Tenant')}
-                </button>
+                <button type="button" className="btn" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{creating ? 'Saving...' : 'Save Tenant'}</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Password Credentials Modal */}
-      {showPasswordModal && newTenantCredentials && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 1001, padding: 20
-        }}>
-          <div className="card" style={{maxWidth: 500, width: '100%', background: 'white', border: '3px solid #10b981'}}>
-            <div style={{textAlign: 'center', marginBottom: 20}}>
-              <div style={{fontSize: 48, marginBottom: 8}}>✅</div>
-              <h3 style={{margin: 0, color: '#10b981'}}>Tenant Created Successfully!</h3>
-            </div>
-            <div style={{padding: 16, background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 8, marginBottom: 20}}>
-              <h4 style={{margin: '0 0 12px 0', color: '#92400e', fontSize: 14}}>📋 LOGIN CREDENTIALS</h4>
-              <div style={{marginBottom: 12}}>
-                <div style={{fontSize: 12, color: '#78350f', marginBottom: 2}}>Email:</div>
-                <div style={{padding: 8, background: 'white', borderRadius: 4, fontFamily: 'monospace', fontSize: 14, fontWeight: 600, wordBreak: 'break-all'}}>{newTenantCredentials.email}</div>
-              </div>
-              <div style={{marginBottom: 12}}>
-                <div style={{fontSize: 12, color: '#78350f', marginBottom: 2}}>Temporary Password:</div>
-                <div style={{padding: 8, background: 'white', borderRadius: 4, fontFamily: 'monospace', fontSize: 16, fontWeight: 700, color: '#dc2626', letterSpacing: '2px'}}>{newTenantCredentials.password}</div>
-              </div>
-              <div style={{padding: 8, background: '#fbbf24', borderRadius: 4, fontSize: 12, color: '#92400e', fontWeight: 600}}>
-                ⚠️ IMPORTANT: Share these credentials with the tenant. They MUST change the password on first login!
-              </div>
-            </div>
-            <div style={{padding: 12, background: '#eff6ff', borderRadius: 6, marginBottom: 20, fontSize: 13}}>
-              <strong style={{color: '#1e40af'}}>📱 Instructions for Tenant:</strong>
-              <ol style={{margin: '8px 0 0 0', paddingLeft: 20, color: '#1e3a8a'}}>
-                <li>Login with the credentials above</li>
-                <li>You will be forced to change password immediately</li>
-                <li>Choose a strong, memorable password</li>
-                <li>You can change it anytime in Settings</li>
-              </ol>
-            </div>
-            <button onClick={closePasswordModal} className="btn btn-primary" style={{width: '100%', padding: '12px'}}>Got it! Create Another Tenant</button>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
+import { exportToPDF } from '../utils/pdfExport';
 
 export default function AdminPaymentsManager() {
   const { userProfile } = useAuth();
@@ -77,8 +78,6 @@ export default function AdminPaymentsManager() {
     rejected: payments.filter(p => p.status === 'Rejected').length
   };
 
-  if (loading) return <div className="card" style={{textAlign: 'center', padding: '40px'}}>Loading payments...</div>;
-
   const downloadCSV = () => {
     const headers = ['Tenant', 'House', 'Amount', 'Date', 'Method', 'Reference', 'Status'];
     const rows = payments.map(p => [
@@ -91,34 +90,43 @@ export default function AdminPaymentsManager() {
       p.status
     ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `tenant_payments_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = `tenant_payments_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
   };
+
+  const downloadPDF = () => {
+    const headers = ['Tenant', 'House', 'Amount', 'Date', 'Method', 'Status'];
+    const data = payments.map(p => [
+      p.tenants?.name || 'Unknown',
+      p.tenants?.house || '-',
+      `KSh ${parseFloat(p.amount).toLocaleString()}`,
+      new Date(p.date).toLocaleDateString(),
+      p.method || 'N/A',
+      p.status
+    ]);
+    exportToPDF({
+      title: 'Rent Payments Collection Report',
+      filename: 'Rent_Payments_Report',
+      headers,
+      data,
+      subtitle: `Property Manager: ${userProfile?.name} | Total Records: ${payments.length}`
+    });
+  };
+
+  if (loading) return <div className="card" style={{textAlign: 'center', padding: '40px'}}>Loading payments...</div>;
 
   return (
     <div>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24}}>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12}}>
         <h2 style={{margin: 0}}>Payment Management</h2>
-        <button 
-          onClick={downloadCSV}
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-          disabled={payments.length === 0}
-        >
-          📥 Download CSV
-        </button>
+        <div style={{display: 'flex', gap: 10}}>
+          <button onClick={downloadCSV} className="btn" style={{background: 'var(--green)', color: 'white'}}>📊 CSV</button>
+          <button onClick={downloadPDF} className="btn" style={{background: 'var(--red)', color: 'white'}}>📄 PDF</button>
+        </div>
       </div>
 
       <div className="grid" style={{marginBottom: 24}}>
@@ -145,72 +153,73 @@ export default function AdminPaymentsManager() {
       </div>
 
       <div className="card" style={{padding: 0}}>
-        <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse'}}>
-          <thead>
-            <tr style={{background: 'var(--bg)', borderBottom: '2px solid var(--border)'}}>
-              <th style={{padding: 12}}>Tenant</th>
-              <th>Amount</th>
-              <th>Method</th>
-              <th style={{minWidth: 120}}>Transaction Code</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payments.length === 0 ? (
-              <tr><td colSpan="7" style={{padding: 24, textAlign: 'center', color: 'var(--gray)'}}>No payments found.</td></tr>
-            ) : (
-              payments.map(p => (
-                <tr key={p.id} style={{borderBottom: '1px solid var(--border)'}}>
-                  <td style={{padding: 12}}>
-                    <strong>{p.tenants?.name || 'Unknown'}</strong>
-                    <div style={{fontSize: 12, color: 'var(--gray)'}}>Unit {p.tenants?.house || '-'}</div>
-                  </td>
-                  <td style={{fontWeight: 600}}>KSh {p.amount}</td>
-                  <td>{p.method}</td>
-                  <td>
-                    <span style={{
-                      fontFamily: 'monospace', 
-                      background: 'var(--bg)', 
-                      padding: '4px 8px', 
-                      borderRadius: 4, 
-                      fontWeight: 'bold',
-                      display: 'inline-block'
-                    }}>
-                      {p.reference}
-                    </span>
-                  </td>
-                  <td style={{fontSize: 12, color: 'var(--gray)'}}>{new Date(p.date).toLocaleDateString()}</td>
-                  <td>
-                    <span className="badge" style={getStatusStyle(p.status)}>{p.status}</span>
-                  </td>
-                  <td>
-                    {p.status === 'Pending' && (
-                      <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                        <button 
-                          className="btn" 
-                          style={{fontSize: 12, padding: '4px 8px', background: 'var(--green)', color: 'white'}}
-                          onClick={() => confirmPayment(p.id)}
-                        >
-                          ✓ Verify & Confirm
-                        </button>
-                        <button 
-                          className="btn" 
-                          style={{fontSize: 12, padding: '4px 8px', background: 'var(--red)', color: 'white'}}
-                          onClick={() => rejectPayment(p.id)}
-                        >
-                          ✗ Reject
-                        </button>
-                      </div>
-                    )}
-                    {p.status !== 'Pending' && <span style={{fontSize: 12, color: 'var(--gray)'}}>-</span>}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        <div style={{overflowX: 'auto'}}>
+          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse'}}>
+            <thead>
+              <tr style={{background: 'var(--bg)', borderBottom: '2px solid var(--border)'}}>
+                <th style={{padding: 12}}>Tenant</th>
+                <th>Amount</th>
+                <th>Method</th>
+                <th style={{minWidth: 120}}>Transaction Code</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.length === 0 ? (
+                <tr><td colSpan="7" style={{padding: 24, textAlign: 'center', color: 'var(--gray)'}}>No payments found.</td></tr>
+              ) : (
+                payments.map(p => (
+                  <tr key={p.id} style={{borderBottom: '1px solid var(--border)'}}>
+                    <td style={{padding: 12}}>
+                      <strong>{p.tenants?.name || 'Unknown'}</strong>
+                      <div style={{fontSize: 12, color: 'var(--gray)'}}>Unit {p.tenants?.house || '-'}</div>
+                    </td>
+                    <td style={{fontWeight: 600}}>KSh {p.amount}</td>
+                    <td>{p.method}</td>
+                    <td>
+                      <span style={{
+                        fontFamily: 'monospace', 
+                        background: 'var(--bg)', 
+                        padding: '4px 8px', 
+                        borderRadius: 4, 
+                        fontWeight: 'bold',
+                        display: 'inline-block'
+                      }}>
+                        {p.reference}
+                      </span>
+                    </td>
+                    <td style={{fontSize: 12, color: 'var(--gray)'}}>{new Date(p.date).toLocaleDateString()}</td>
+                    <td>
+                      <span className="badge" style={getStatusStyle(p.status)}>{p.status}</span>
+                    </td>
+                    <td>
+                      {p.status === 'Pending' && (
+                        <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                          <button 
+                            className="btn" 
+                            style={{fontSize: 12, padding: '4px 8px', background: 'var(--green)', color: 'white'}}
+                            onClick={() => confirmPayment(p.id)}
+                          >
+                            ✓ Verify & Confirm
+                          </button>
+                          <button 
+                            className="btn" 
+                            style={{fontSize: 12, padding: '4px 8px', background: 'var(--red)', color: 'white'}}
+                            onClick={() => rejectPayment(p.id)}
+                          >
+                            ✗ Reject
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

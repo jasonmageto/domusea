@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { toast } from 'react-hot-toast';
+import { exportToPDF } from '../utils/pdfExport';
 
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -202,8 +203,39 @@ const PropertyMap = ({ filter = 'all', enableRealtime = true }) => {
     );
   }
 
+  const downloadCSV = () => {
+    const headers = ['Property Name', 'Address', 'City', 'Vacant Units', 'Total Units', 'Caretaker', 'Phone'];
+    const rows = properties.map(p => [
+      p.name, p.address, p.city, p.vacant_units, p.total_units, p.caretaker_name || 'N/A', p.caretaker_phone || 'N/A'
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `properties_list_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const downloadPDF = () => {
+    const headers = ['Name', 'Address', 'Vacant', 'Total', 'Caretaker'];
+    const data = properties.map(p => [
+      p.name, p.address, p.vacant_units, p.total_units, p.caretaker_name || 'N/A'
+    ]);
+    exportToPDF({
+      title: 'Real Estate Properties Records',
+      filename: 'Properties_List',
+      headers,
+      data,
+      subtitle: `Total Registered Properties: ${properties.length}`
+    });
+  };
+
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative', minHeight: '600px' }}>
+      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'flex', gap: 8 }}>
+        <button onClick={downloadCSV} className="btn btn-sm" style={{background: 'var(--green)', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)'}}>📊 CSV</button>
+        <button onClick={downloadPDF} className="btn btn-sm" style={{background: 'var(--red)', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)'}}>📄 PDF</button>
+      </div>
       
       <MapContainer
         center={defaultCenter}

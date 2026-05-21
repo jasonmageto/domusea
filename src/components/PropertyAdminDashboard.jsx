@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
+import { exportToPDF } from '../utils/pdfExport';
 
 export default function PropertyAdminDashboard() {
   const { userProfile } = useAuth();
@@ -95,11 +96,35 @@ export default function PropertyAdminDashboard() {
     }
   }
 
+  const downloadTenantPDF = () => {
+    const headers = ['Name', 'House/Unit', 'Rent Amount', 'Payment Status'];
+    const data = tenants.map(t => [
+      t.name,
+      t.house || 'N/A',
+      `KSh ${parseFloat(t.rent).toLocaleString()}`,
+      t.status?.toUpperCase() || 'GOOD'
+    ]);
+    exportToPDF({
+      title: 'Property Tenant Records',
+      filename: 'My_Tenants_List',
+      headers,
+      data,
+      subtitle: `Property Manager: ${userProfile?.name} | Total Tenants: ${tenants.length}`
+    });
+  };
+
   if (loading) return <div className="card" style={{textAlign: 'center', padding: '40px'}}>Loading Dashboard...</div>;
 
   return (
     <div>
-      <h2 style={{marginBottom: 24}}>Property Admin Dashboard</h2>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12}}>
+        <h2 style={{margin: 0}}>Property Admin Dashboard</h2>
+        {tenants.length > 0 && (
+          <button onClick={downloadTenantPDF} className="btn" style={{background: 'var(--red)', color: 'white', display: 'flex', alignItems: 'center', gap: 8}}>
+            📄 Download Tenant PDF
+          </button>
+        )}
+      </div>
 
       {/* Subscription Info */}
       <div className="card" style={{marginBottom: 24, borderLeft: '4px solid var(--blue)'}}>

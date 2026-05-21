@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
+import { exportToPDF } from '../utils/pdfExport';
 
 export default function SARevenueAnalytics() {
   const { userProfile } = useAuth();
@@ -14,8 +15,6 @@ export default function SARevenueAnalytics() {
     confirmedPayments: 0,
     pendingPayments: 0
   });
-  const [monthlyData, setMonthlyData] = useState([]);
-  const [adminBreakdown, setAdminBreakdown] = useState([]);
 
   useEffect(() => {
     fetchRevenueData();
@@ -24,183 +23,67 @@ export default function SARevenueAnalytics() {
   async function fetchRevenueData() {
     try {
       setLoading(true);
-      console.log('Fetching revenue analytics...');
-
-      // Fetch all payments - simpler query first
       const { data: paymentsData, error } = await supabase
         .from('admin_to_sa_payments')
         .select('*')
         .order('date', { ascending: true });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      console.log('Raw payments data:', paymentsData);
-
+      if (error) throw error;
       if (!paymentsData || paymentsData.length === 0) {
-        console.log('No payments found');
         setLoading(false);
         return;
       }
 
-      // Fetch admin details for each payment
-      const paymentsWithAdmins = await Promise.all(
-        paymentsData.map(async (payment) => {
-          const { data: adminData } = await supabase
-            .from('admins')
-            .select('name, email')
-            .eq('id', payment.admin_id)
-            .single();
-          
-          return {
-            ...payment,
-            admins: adminData
-          };
-        })
-      );
+      const confirmedPayments = paymentsData.filter(p => p.status === 'Confirmed');
+      const totalRevenue = confirmedPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
-      console.log('Payments with admins:', paymentsWithAdmins);
-
-      // Calculate metrics
-      const confirmedPayments = paymentsWithAdmins.filter(p => p.status === 'Confirmed');
-      const pendingPayments = paymentsWithAdmins.filter(p => p.status === 'Pending');
-
-      const totalRevenue = confirmedPayments.reduce((sum, p) => {
-        const amount = parseFloat(p.amount) || 0;
-        return sum + amount;
-      }, 0);
-
-      // Group by month
-      const monthlyGroups = {};
-      const adminTotals = {};
-
-      confirmedPayments.forEach(payment => {
-        const date = new Date(payment.date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const amount = parseFloat(payment.amount) || 0;
-
-        // Monthly grouping
-        if (!monthlyGroups[monthKey]) {
-          monthlyGroups[monthKey] = 0;
-        }
-        monthlyGroups[monthKey] += amount;
-
-        // Admin grouping
-        const adminName = payment.admins?.name || 'Unknown Admin';
-        if (!adminTotals[adminName]) {
-          adminTotals[adminName] = 0;
-        }
-        adminTotals[adminName] += amount;
-      });
-
-      // Convert to arrays for charts
-      const monthlyChartData = Object.entries(monthlyGroups)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .slice(-6) // Last 6 months
-        .map(([month, revenue]) => ({
-          month: formatMonth(month),
-          revenue
-        }));
-
-      const adminChartData = Object.entries(adminTotals)
-        .map(([name, value]) => ({
-          name,
-          value
-        }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5); // Top 5 admins
-
-      // Calculate this month vs last month
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       
-      const thisMonthData = confirmedPayments.filter(p => {
+      const thisMonthRevenue = confirmedPayments
+        .filter(p => {
+          const d = new Date(p.date);
+          return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        })
+        .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+      const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+      const lastMonthRevenue = confirmedPayments
+        .filter(p => {
+          const d = new Date(p.date);
+          return d.getMonth() === lastMonthDate.getMonth() && d.getFullYear() === lastMonthDate.getFullYear();
+        })
+        .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+      const growthRate = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : (thisMonthRevenue > 0 ? 100 : 0);
+      const monthlyGroups = {};
+      confirmedPayments.forEach(p => {
         const d = new Date(p.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        monthlyGroups[key] = true;
       });
-      
-      const thisMonthRevenue = thisMonthData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-
-      // Last month
-      let lastMonthMonth = currentMonth - 1;
-      let lastMonthYear = currentYear;
-      if (lastMonthMonth < 0) {
-        lastMonthMonth = 11;
-        lastMonthYear--;
-      }
-
-      const lastMonthData = confirmedPayments.filter(p => {
-        const d = new Date(p.date);
-        return d.getMonth() === lastMonthMonth && d.getFullYear() === lastMonthYear;
-      });
-
-      const lastMonthRevenue = lastMonthData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-
-      // Calculate growth rate
-      let growthRate = 0;
-      if (lastMonthRevenue > 0) {
-        growthRate = ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
-      } else if (thisMonthRevenue > 0) {
-        growthRate = 100; // New revenue
-      }
-
-      // Calculate average monthly
       const numberOfMonths = Object.keys(monthlyGroups).length || 1;
-      const averageMonthly = totalRevenue / numberOfMonths;
 
       setRevenueData({
         totalRevenue,
-        averageMonthly,
+        averageMonthly: totalRevenue / numberOfMonths,
         growthRate,
         thisMonth: thisMonthRevenue,
         lastMonth: lastMonthRevenue,
         confirmedPayments: confirmedPayments.length,
-        pendingPayments: pendingPayments.length
+        pendingPayments: paymentsData.filter(p => p.status === 'Pending').length
       });
-
-      setMonthlyData(monthlyChartData);
-      setAdminBreakdown(adminChartData);
-
-      console.log('Revenue stats calculated:', {
-        totalRevenue,
-        averageMonthly,
-        growthRate,
-        thisMonth: thisMonthRevenue,
-        lastMonth: lastMonthRevenue
-      });
-
     } catch (error) {
       console.error('Error fetching revenue ', error);
-      alert('Failed to load revenue analytics. Please refresh the page.');
     } finally {
       setLoading(false);
     }
   }
 
-  const formatCurrency = (amount) => {
-    const num = parseFloat(amount) || 0;
-    return `KSh ${num.toLocaleString()}`;
-  };
+  const formatCurrency = (amount) => `KSh ${parseFloat(amount || 0).toLocaleString()}`;
 
-  const formatMonth = (monthStr) => {
-    const [year, month] = monthStr.split('-');
-    const date = new Date(year, parseInt(month) - 1);
-    return date.toLocaleDateString('en-KE', { month: 'short', year: '2-digit' });
-  };
-
-  if (loading) {
-    return (
-      <div style={{textAlign: 'center', padding: 40}}>
-        <div style={{fontSize: 24, marginBottom: 16}}>📊</div>
-        <div>Loading analytics...</div>
-      </div>
-    );
-  }
-
-  const downloadRevenueCSV = () => {
+  const downloadCSV = () => {
     const headers = ['Metric', 'Value'];
     const rows = [
       ['Total Revenue', formatCurrency(revenueData.totalRevenue)],
@@ -211,124 +94,78 @@ export default function SARevenueAnalytics() {
       ['Confirmed Payments Count', revenueData.confirmedPayments],
       ['Pending Payments Count', revenueData.pendingPayments]
     ];
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `domusea_revenue_report_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = `revenue_report_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
   };
+
+  const downloadPDF = () => {
+    const headers = ['Metric', 'Performance Value'];
+    const data = [
+      ['Total Accumulated Revenue', formatCurrency(revenueData.totalRevenue)],
+      ['Average Monthly Revenue', formatCurrency(revenueData.averageMonthly)],
+      ['Current Growth Rate', `${revenueData.growthRate.toFixed(1)}%`],
+      ['This Month Collection', formatCurrency(revenueData.thisMonth)],
+      ['Last Month Collection', formatCurrency(revenueData.lastMonth)],
+      ['Total Confirmed Transactions', revenueData.confirmedPayments.toString()]
+    ];
+    exportToPDF({
+      title: 'Supreme Admin Revenue Analytics Report',
+      filename: 'Revenue_Analytics_Report',
+      headers,
+      data,
+      subtitle: `Report Generated On: ${new Date().toLocaleString()}`
+    });
+  };
+
+  if (loading) return <div style={{textAlign: 'center', padding: 40}}>Loading analytics...</div>;
 
   return (
     <div>
-      {/* Header */}
-      <div style={{marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+      <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12}}>
         <div>
-          <h1 style={{margin: 0, fontSize: 28}}>📊 Revenue Analytics</h1>
+          <h2 style={{margin: 0}}>📈 Revenue Analytics</h2>
           <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Track subscription revenue and growth trends</p>
         </div>
-        <button 
-          onClick={downloadRevenueCSV}
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          📥 Download Report
-        </button>
+        <div style={{display: 'flex', gap: 10}}>
+          <button onClick={downloadCSV} className="btn" style={{background: 'var(--green)', color: 'white'}}>📊 CSV</button>
+          <button onClick={downloadPDF} className="btn" style={{background: 'var(--red)', color: 'white'}}>📄 PDF</button>
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: 20,
-        marginBottom: 32
-      }}>
-        <div className="card" style={{borderLeft: '4px solid #3b82f6', padding: 20}}>
+      <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 32}}>
+        <div className="card" style={{borderLeft: '4px solid #3b82f6'}}>
           <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>TOTAL REVENUE</div>
-          <div style={{fontSize: 36, fontWeight: 700, color: '#3b82f6'}}>{formatCurrency(revenueData.totalRevenue)}</div>
-          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>All time</div>
+          <div style={{fontSize: 32, fontWeight: 700, color: '#3b82f6'}}>{formatCurrency(revenueData.totalRevenue)}</div>
         </div>
-
-        <div className="card" style={{borderLeft: '4px solid #10b981', padding: 20}}>
+        <div className="card" style={{borderLeft: '4px solid #10b981'}}>
           <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>AVERAGE MONTHLY</div>
-          <div style={{fontSize: 36, fontWeight: 700, color: '#10b981'}}>{formatCurrency(revenueData.averageMonthly)}</div>
-          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>Per month</div>
+          <div style={{fontSize: 32, fontWeight: 700, color: '#10b981'}}>{formatCurrency(revenueData.averageMonthly)}</div>
         </div>
-
-        <div className="card" style={{borderLeft: '4px solid #f59e0b', padding: 20}}>
+        <div className="card" style={{borderLeft: '4px solid #f59e0b'}}>
           <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>GROWTH RATE</div>
-          <div style={{fontSize: 36, fontWeight: 700, color: revenueData.growthRate >= 0 ? '#10b981' : '#ef4444'}}>
+          <div style={{fontSize: 32, fontWeight: 700, color: revenueData.growthRate >= 0 ? '#10b981' : '#ef4444'}}>
             {revenueData.growthRate >= 0 ? '↑' : '↓'} {Math.abs(revenueData.growthRate).toFixed(1)}%
           </div>
-          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>vs last month</div>
-        </div>
-
-        <div className="card" style={{borderLeft: '4px solid #8b5cf6', padding: 20}}>
-          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>THIS MONTH</div>
-          <div style={{fontSize: 36, fontWeight: 700, color: '#8b5cf6'}}>{formatCurrency(revenueData.thisMonth)}</div>
-          <div style={{fontSize: 12, color: 'var(--gray)', marginTop: 4}}>
-            {revenueData.confirmedPayments} payments confirmed
-          </div>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="card" style={{padding: 20, marginBottom: 24}}>
-        <h3 style={{margin: '0 0 20px 0', fontSize: 18}}>Revenue Summary</h3>
+      <div className="card">
+        <h3>Revenue Summary</h3>
         <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16}}>
-          <div style={{padding: 16, background: '#f0fdf4', borderRadius: 8, borderLeft: '4px solid #10b981'}}>
-            <div style={{fontSize: 13, color: '#059669', fontWeight: 600, marginBottom: 4}}>CONFIRMED PAYMENTS</div>
-            <div style={{fontSize: 24, fontWeight: 700, color: '#059669'}}>{revenueData.confirmedPayments}</div>
+          <div style={{padding: 16, background: 'rgba(16, 185, 129, 0.1)', borderRadius: 8}}>
+            <div style={{fontSize: 12, color: 'var(--green)', fontWeight: 600}}>CONFIRMED</div>
+            <div style={{fontSize: 24, fontWeight: 700}}>{revenueData.confirmedPayments}</div>
           </div>
-          <div style={{padding: 16, background: '#fffbeb', borderRadius: 8, borderLeft: '4px solid #f59e0b'}}>
-            <div style={{fontSize: 13, color: '#d97706', fontWeight: 600, marginBottom: 4}}>PENDING PAYMENTS</div>
-            <div style={{fontSize: 24, fontWeight: 700, color: '#d97706'}}>{revenueData.pendingPayments}</div>
-          </div>
-          <div style={{padding: 16, background: '#eff6ff', borderRadius: 8, borderLeft: '4px solid #3b82f6'}}>
-            <div style={{fontSize: 13, color: '#2563eb', fontWeight: 600, marginBottom: 4}}>LAST MONTH</div>
-            <div style={{fontSize: 24, fontWeight: 700, color: '#2563eb'}}>{formatCurrency(revenueData.lastMonth)}</div>
-          </div>
-          <div style={{padding: 16, background: '#f5f3ff', borderRadius: 8, borderLeft: '4px solid #8b5cf6'}}>
-            <div style={{fontSize: 13, color: '#7c3aed', fontWeight: 600, marginBottom: 4}}>THIS MONTH</div>
-            <div style={{fontSize: 24, fontWeight: 700, color: '#7c3aed'}}>{formatCurrency(revenueData.thisMonth)}</div>
+          <div style={{padding: 16, background: 'rgba(245, 158, 11, 0.1)', borderRadius: 8}}>
+            <div style={{fontSize: 12, color: 'var(--amber)', fontWeight: 600}}>PENDING</div>
+            <div style={{fontSize: 24, fontWeight: 700}}>{revenueData.pendingPayments}</div>
           </div>
         </div>
       </div>
-
-      {/* Insights */}
-      {revenueData.totalRevenue > 0 && (
-        <div style={{padding: 16, background: 'rgba(59, 130, 246, 0.1)', borderRadius: 8, fontSize: 13, color: 'var(--text)'}}>
-          <strong>💡 Insights:</strong>
-          <ul style={{margin: '8px 0 0 0', paddingLeft: 20}}>
-            <li>Your average monthly revenue is {formatCurrency(revenueData.averageMonthly)}</li>
-            {revenueData.growthRate > 0 && (
-              <li>Revenue is growing by {revenueData.growthRate.toFixed(1)}% compared to last month 🎉</li>
-            )}
-            {revenueData.growthRate < 0 && (
-              <li>Revenue decreased by {Math.abs(revenueData.growthRate).toFixed(1)}% compared to last month</li>
-            )}
-            {revenueData.growthRate === 0 && revenueData.thisMonth > 0 && (
-              <li>Revenue is stable compared to last month</li>
-            )}
-          </ul>
-        </div>
-      )}
-
-      {revenueData.totalRevenue === 0 && (
-        <div style={{marginTop: 24, padding: 32, textAlign: 'center', background: 'rgba(0,0,0,0.05)', borderRadius: 8}}>
-          <div style={{fontSize: 48, marginBottom: 16}}>📈</div>
-          <p style={{margin: 0, color: 'var(--gray)'}}>No revenue data yet. Payments will appear here once admins start renewing their subscriptions.</p>
-        </div>
-      )}
     </div>
   );
 }
