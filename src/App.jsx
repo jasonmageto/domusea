@@ -340,15 +340,20 @@ const Sidebar = ({ userProfile, activeTab, setActiveTab, isSidebarOpen, setIsSid
       )}
 
       <aside className={`
-        fixed md:static inset-y-0 left-0 z-[60]
+        fixed md:static inset-y-0 left-0 z-[100]
         w-72 bg-[var(--card)] border-r border-[var(--border)]
         transform ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'} 
         md:translate-x-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
-        flex flex-col
+        flex flex-col h-full
       `}>
-        <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
-          <div className="text-xl font-bold text-[var(--blue)]">🏠 DomusEA</div>
-          <button className="md:hidden" onClick={() => setIsSidebarOpen(false)}>✕</button>
+        <div className="p-6 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)] sticky top-0 z-10">
+          <div className="text-xl font-extrabold text-[var(--blue)] tracking-tight">🏠 DomusEA</div>
+          <button 
+            className="md:hidden w-8 h-8 flex items-center justify-center hover:bg-[var(--bg)] rounded-full transition-colors" 
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <span style={{fontSize: '20px'}}>✕</span>
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -483,26 +488,26 @@ function App() {
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile Menu Toggle - Fixed and Improved */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-[50] flex items-center justify-between px-4 shadow-sm backdrop-blur-md bg-opacity-90">
+        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[var(--card)] border-b border-[var(--border)] z-[50] flex items-center justify-between px-4 shadow-sm backdrop-blur-md bg-opacity-90">
           <button 
-            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-xl transition-all active:scale-90"
+            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-all active:scale-90"
             onClick={() => setIsSidebarOpen(true)}
             aria-label="Open Menu"
           >
             <span style={{fontSize: '24px'}}>☰</span>
           </button>
-          <div className="font-extrabold text-xl tracking-tight text-[var(--blue)]">DomusEA</div>
+          <div className="font-extrabold text-lg tracking-tight text-[var(--blue)]">DomusEA</div>
           <button 
-            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-xl transition-all active:scale-90"
+            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-all active:scale-90"
             onClick={() => setIsDark(!isDark)}
             aria-label="Toggle Theme"
           >
-            <span style={{fontSize: '20px'}}>{isDark ? '☀️' : '🌙'}</span>
+            <span style={{fontSize: '18px'}}>{isDark ? '☀️' : '🌙'}</span>
           </button>
         </div>
 
         {/* Main Content Area - Added padding-top for mobile header */}
-        <main className={`flex-1 overflow-y-auto p-4 md:p-8 pt-20 md:pt-8 transition-all duration-300 ${isSidebarOpen ? 'md:ml-0' : ''}`}>
+        <main className={`flex-1 overflow-y-auto p-4 md:p-8 pt-16 md:pt-8 transition-all duration-300`}>
           <div className="max-w-7xl mx-auto pb-16">
             <AppContent 
               userProfile={userProfile} 
