@@ -58,67 +58,89 @@ const LoginScreen = ({ isDark }) => {
   };
 
   const loginStyles = {
-    container: { display: 'flex', minHeight: '100vh', fontFamily: "'Inter', sans-serif" },
+    container: { 
+      display: 'flex', 
+      minHeight: '100vh', 
+      fontFamily: "'Inter', sans-serif",
+      background: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat fixed`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    },
+    glassCard: {
+      display: 'flex',
+      maxWidth: '1000px',
+      width: '100%',
+      minHeight: '600px',
+      background: 'rgba(255, 255, 255, 0.95)',
+      backdropFilter: 'blur(20px)',
+      borderRadius: '30px',
+      overflow: 'hidden',
+      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+      border: '1px solid rgba(255, 255, 255, 0.3)'
+    },
     leftPanel: { 
       flex: 1, 
-      background: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80') center/cover no-repeat`, 
-      position: 'relative', 
-      display: 'flex', 
-      alignItems: 'center', 
-      padding: '60px' 
+      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', 
+      color: 'white',
+      padding: '60px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      position: 'relative'
     },
-    overlay: { position: 'relative', zIndex: 2, maxWidth: '500px' },
-    quoteContainer: { color: 'white' },
-    quoteHeader: { fontSize: '12px', fontWeight: '600', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px', opacity: 0.9 },
-    mainQuote: { fontSize: '48px', fontWeight: '700', lineHeight: '1.2', marginBottom: '30px', letterSpacing: '-1px' },
-    quoteText: { fontSize: '16px', lineHeight: '1.8', opacity: 0.9, marginBottom: '40px', fontStyle: 'italic' },
-    branding: { marginTop: '40px' },
-    logo: { fontSize: '24px', fontWeight: '700', marginBottom: '8px' },
-    tagline: { fontSize: '14px', opacity: 0.8 },
     rightPanel: { 
-      flex: 1, 
-      display: 'flex', 
-      flexDirection: 'column', 
-      background: 'var(--bg, #ffffff)', 
-      color: 'var(--text, #111827)',
-      position: 'relative',
-      transition: 'background 0.3s, color 0.3s'
+      flex: 1.2, 
+      padding: '60px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      background: 'white'
     },
-    topBar: { padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', flexShrink: 0 },
-    contactInfo: { display: 'flex', gap: '24px', alignItems: 'center' },
-    contactItem: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#374151', fontWeight: '500' },
-    whatsappText: { color: '#10b981', fontWeight: '600' },
-    developerInfo: { fontSize: '13px', color: 'var(--gray, #6b7280)' },
-    developer: { color: 'var(--blue, #667eea)', fontWeight: '600' },
-    loginContainer: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '60px 40px', maxWidth: '450px', margin: '0 auto', width: '100%' },
-    header: { marginBottom: '40px' },
-    logoSmall: { fontSize: '20px', fontWeight: '700', color: 'var(--blue, #667eea)', marginBottom: '20px' },
-    welcomeTitle: { fontSize: '32px', fontWeight: '700', color: 'var(--text, #111827)', marginBottom: '8px', letterSpacing: '-0.5px' },
-    welcomeSubtitle: { fontSize: '15px', color: 'var(--gray, #6b7280)', lineHeight: '1.5' },
-    form: { display: 'flex', flexDirection: 'column', gap: '24px' },
+    quoteHeader: { fontSize: '12px', fontWeight: '600', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px', color: '#667eea' },
+    mainQuote: { fontSize: '40px', fontWeight: '800', lineHeight: '1.2', marginBottom: '20px' },
+    quoteText: { fontSize: '15px', lineHeight: '1.6', opacity: 0.8, marginBottom: '40px' },
+    branding: { marginTop: 'auto' },
+    logo: { fontSize: '24px', fontWeight: '800', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' },
+    welcomeTitle: { fontSize: '32px', fontWeight: '800', color: '#1e293b', marginBottom: '10px' },
+    welcomeSubtitle: { fontSize: '15px', color: '#64748b', marginBottom: '30px' },
+    form: { display: 'flex', flexDirection: 'column', gap: '20px' },
     inputGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
-    label: { fontSize: '14px', fontWeight: '600', color: 'var(--text, #111827)', letterSpacing: '0.3px' },
-    inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
-    inputIcon: { position: 'absolute', left: '16px', fontSize: '18px', zIndex: 1, opacity: 0.7 },
+    label: { fontSize: '14px', fontWeight: '600', color: '#1e293b' },
+    inputWrapper: { position: 'relative' },
+    inputIcon: { position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 },
     input: { 
       width: '100%', 
-      padding: '14px 16px 14px 48px', 
-      border: '2px solid var(--border, #e5e7eb)', 
+      padding: '14px 16px 14px 45px', 
+      border: '1px solid #e2e8f0', 
       borderRadius: '12px', 
       fontSize: '15px', 
-      outline: 'none', 
-      background: 'var(--input-bg, #f9fafb)', 
-      color: 'var(--text, #111827)',
-      boxSizing: 'border-box' 
+      background: '#f8fafc',
+      outline: 'none',
+      transition: 'all 0.2s'
     },
-    signInButton: { width: '100%', padding: '16px', background: 'var(--text, #111827)', color: 'var(--bg, #ffffff)', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
-    footer: { 
-      padding: '24px 40px', 
-      borderTop: '1px solid var(--border, #e5e7eb)', 
-      background: 'var(--footer-bg, #f9fafb)', 
-      flexShrink: 0 
+    signInButton: { 
+      width: '100%', 
+      padding: '16px', 
+      background: '#1e293b', 
+      color: 'white', 
+      border: 'none', 
+      borderRadius: '12px', 
+      fontSize: '16px', 
+      fontWeight: '700', 
+      cursor: 'pointer',
+      marginTop: '10px',
+      transition: 'all 0.2s'
     },
-    securityBadge: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', color: '#9ca3af', fontWeight: '500' }
+    loginFooter: {
+      marginTop: '30px',
+      paddingTop: '20px',
+      borderTop: '1px solid #f1f5f9',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      fontSize: '13px'
+    }
   };
 
   if (error === 'FROZEN_TENANT' || error === 'FROZEN_ADMIN') {
@@ -145,92 +167,74 @@ const LoginScreen = ({ isDark }) => {
 
   return (
     <div className={isDark ? 'dark' : ''} style={loginStyles.container}>
-      <div className="login-left" style={loginStyles.leftPanel}>
-        <div style={loginStyles.overlay}>
-          <div style={loginStyles.quoteContainer}>
-            <div style={loginStyles.quoteHeader}>A WISE QUOTE</div>
-            <h1 style={loginStyles.mainQuote}>Build Better.<br/>Manage Smarter.</h1>
-            <p style={loginStyles.quoteText}>"The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."</p>
-            <div style={loginStyles.branding}>
-              <div style={loginStyles.logo}>🏠 DomusEA</div>
-              <div style={loginStyles.tagline}>Property Management Redefined</div>
-            </div>
+      <div style={loginStyles.glassCard} className="login-card">
+        <div className="login-left" style={loginStyles.leftPanel}>
+          <div style={loginStyles.quoteHeader}>A WISE QUOTE</div>
+          <h1 style={loginStyles.mainQuote}>Build Better.<br/>Manage Smarter.</h1>
+          <p style={loginStyles.quoteText}>"The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."</p>
+          <div style={loginStyles.branding}>
+            <div style={loginStyles.logo}>🏠 DomusEA</div>
+            <div style={{fontSize: '14px', opacity: 0.7, marginTop: '5px'}}>Property Management Redefined</div>
           </div>
         </div>
-      </div>
 
-      <div className="login-right" style={loginStyles.rightPanel}>
-        {/* Mobile Background Image - only visible on mobile */}
-        <div className="md:hidden absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80" 
-            alt="Background"
-            className="w-full h-full object-cover opacity-20"
-          />
-        </div>
-
-        <div style={loginStyles.loginContainer} className="relative z-10">
-          <div style={loginStyles.header}>
-            <div style={loginStyles.logoSmall}>🏠 DomusEA</div>
+        <div className="login-right" style={loginStyles.rightPanel}>
+          <div style={{width: '100%'}}>
             <h2 style={loginStyles.welcomeTitle}>Welcome Back</h2>
             <p style={loginStyles.welcomeSubtitle}>Enter your credentials to access your account</p>
-          </div>
 
-          <form style={loginStyles.form} onSubmit={handleLogin}>
-            {error && (
-              <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '14px' }}>⚠️ {error}</div>
-            )}
-            <div style={loginStyles.inputGroup}>
-              <label style={loginStyles.label}>Email Address</label>
-              <div style={loginStyles.inputWrapper}>
-                <span style={loginStyles.inputIcon}>📧</span>
-                <input type="email" placeholder="name@company.com" style={loginStyles.input} value={email} onChange={e => setEmail(e.target.value)} required />
+            <form style={loginStyles.form} onSubmit={handleLogin}>
+              {error && (
+                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '14px' }}>⚠️ {error}</div>
+              )}
+              <div style={loginStyles.inputGroup}>
+                <label style={loginStyles.label}>Email Address</label>
+                <div style={loginStyles.inputWrapper}>
+                  <span style={loginStyles.inputIcon}>📧</span>
+                  <input type="email" placeholder="name@company.com" style={loginStyles.input} value={email} onChange={e => setEmail(e.target.value)} required />
+                </div>
+              </div>
+              <div style={loginStyles.inputGroup}>
+                <label style={loginStyles.label}>Password</label>
+                <div style={loginStyles.inputWrapper}>
+                  <span style={loginStyles.inputIcon}>🔒</span>
+                  <input type="password" placeholder="••••••••" style={loginStyles.input} value={password} onChange={e => setPassword(e.target.value)} required />
+                </div>
+              </div>
+              <button type="submit" disabled={loading} style={loginStyles.signInButton}>
+                {loading ? 'Signing In...' : 'Sign In'}
+              </button>
+            </form>
+
+            <div style={loginStyles.loginFooter}>
+              <div style={{ display: 'flex', gap: '15px' }}>
+                <a href="tel:0711333436" style={{ color: '#1e293b', textDecoration: 'none' }}>📞 Call</a>
+                <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>💬 WhatsApp</a>
+              </div>
+              <div style={{ color: '#64748b', fontSize: '11px' }}>
+                Developed by <span style={{ color: '#667eea', fontWeight: '600' }}>Elizon Tech</span>
               </div>
             </div>
-            <div style={loginStyles.inputGroup}>
-              <label style={loginStyles.label}>Password</label>
-              <div style={loginStyles.inputWrapper}>
-                <span style={loginStyles.inputIcon}>🔒</span>
-                <input type="password" placeholder="••••••••" style={loginStyles.input} value={password} onChange={e => setPassword(e.target.value)} required />
-              </div>
-            </div>
-            <button type="submit" disabled={loading} style={loginStyles.signInButton}>
-              <span>{loading ? 'Signing In...' : 'Sign In'}</span>
-              <span style={{ fontSize: '18px' }}>→</span>
-            </button>
-            <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginTop: '8px' }}>Restricted Access • Authorized Personnel Only</p>
-          </form>
-        </div>
-
-        <div style={{ ...loginStyles.footer, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 40px', fontSize: '12px' }} className="relative z-10">
-          <div style={{ display: 'flex', gap: '20px' }}>
-            <span style={{ color: '#374151' }}>📞 0711 333 436</span>
-            <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>💬 WhatsApp</a>
-          </div>
-          <div style={{ color: '#6b7280' }}>
-            © 2026 DomusEA | Developed by <span style={{ color: '#667eea', fontWeight: '600' }}>Elizon Tech</span>
           </div>
         </div>
       </div>
       <style>{`
         @media (max-width: 768px) { 
-          .login-left { display: none !important; }
-          .login-right {
-            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80') center/cover no-repeat !important;
+          .login-card { 
+            flex-direction: column !important;
+            margin: 15px !important;
+            border-radius: 20px !important;
+            min-height: auto !important;
           }
-          .login-right > div {
-            background: rgba(var(--bg-rgb, 255, 255, 255), 0.95);
-            border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            padding: 40px 20px !important;
-            margin: 20px !important;
-            backdrop-filter: blur(10px);
+          .login-left { 
+            padding: 40px 30px !important;
+            min-height: 200px !important;
           }
-          .login-right .welcomeTitle { color: #111827 !important; }
-          .login-right .welcomeSubtitle { color: #4b5563 !important; }
-          .login-right label { color: #374151 !important; }
-          .login-right .developerInfo { color: #4b5563 !important; }
-          .login-right .securityBadge { color: #6b7280 !important; }
+          .login-right { 
+            padding: 40px 30px !important;
+          }
+          .mainQuote { font-size: 28px !important; }
+          .welcomeTitle { font-size: 24px !important; }
         }
       `}</style>
     </div>
@@ -330,16 +334,16 @@ const Sidebar = ({ userProfile, activeTab, setActiveTab, isSidebarOpen, setIsSid
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
-          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-[55]"
+          className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[55] transition-opacity duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       <aside className={`
         fixed md:static inset-y-0 left-0 z-[60]
-        w-64 bg-[var(--card)] border-r border-[var(--border)]
-        transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-        md:translate-x-0 transition-transform duration-300 ease-in-out
+        w-72 bg-[var(--card)] border-r border-[var(--border)]
+        transform ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'} 
+        md:translate-x-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
         flex flex-col
       `}>
         <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
@@ -479,17 +483,17 @@ function App() {
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile Menu Toggle - Fixed and Improved */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-50 flex items-center justify-between px-4 shadow-sm">
+        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-[50] flex items-center justify-between px-4 shadow-sm backdrop-blur-md bg-opacity-90">
           <button 
-            className="p-2 hover:bg-[var(--bg)] rounded-lg transition-colors"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            aria-label="Toggle Menu"
+            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-xl transition-all active:scale-90"
+            onClick={() => setIsSidebarOpen(true)}
+            aria-label="Open Menu"
           >
-            <span style={{fontSize: '24px'}}>{isSidebarOpen ? '✕' : '☰'}</span>
+            <span style={{fontSize: '24px'}}>☰</span>
           </button>
-          <div className="font-bold text-lg">Domusea</div>
+          <div className="font-extrabold text-xl tracking-tight text-[var(--blue)]">DomusEA</div>
           <button 
-            className="p-2 hover:bg-[var(--bg)] rounded-lg transition-colors"
+            className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-xl transition-all active:scale-90"
             onClick={() => setIsDark(!isDark)}
             aria-label="Toggle Theme"
           >
