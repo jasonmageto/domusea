@@ -331,39 +331,17 @@ const Sidebar = ({ userProfile, activeTab, setActiveTab, isSidebarOpen, setIsSid
 
   return (
     <>
-      {/* Mobile Overlay */}
-      {isSidebarOpen && (
-        <div 
-          className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[55] transition-opacity duration-300"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      <aside className={`
-        fixed md:static inset-y-0 left-0 z-[100]
-        w-72 bg-[var(--card)] border-r border-[var(--border)]
-        transform ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'} 
-        md:translate-x-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
-        flex flex-col h-full
-      `}>
-        <div className="p-6 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)] sticky top-0 z-10">
+      {/* Desktop Sidebar - Always Visible on Desktop */}
+      <aside className="hidden md:flex md:flex-col md:w-72 bg-[var(--card)] border-r border-[var(--border)] h-screen">
+        <div className="p-6 border-b border-[var(--border)]">
           <div className="text-xl font-extrabold text-[var(--blue)] tracking-tight">🏠 DomusEA</div>
-          <button 
-            className="md:hidden w-8 h-8 flex items-center justify-center hover:bg-[var(--bg)] rounded-full transition-colors" 
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <span style={{fontSize: '20px'}}>✕</span>
-          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {currentMenu.map((item) => (
             <button
               key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setIsSidebarOpen(false);
-              }}
+              onClick={() => setActiveTab(item.id)}
               className={`
                 w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
                 ${activeTab === item.id 
@@ -396,6 +374,70 @@ const Sidebar = ({ userProfile, activeTab, setActiveTab, isSidebarOpen, setIsSid
           </div>
         </div>
       </aside>
+
+      {/* Mobile Overlay - Full Screen Popup */}
+      {isSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] transition-opacity duration-300"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+          
+          {/* Mobile Sidebar - Slides from Left */}
+          <aside className="md:hidden fixed inset-y-0 left-0 z-[100] w-72 bg-[var(--card)] shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
+            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+              <div className="text-xl font-extrabold text-[var(--blue)] tracking-tight">🏠 DomusEA</div>
+              <button 
+                className="w-8 h-8 flex items-center justify-center hover:bg-[var(--bg)] rounded-full transition-colors" 
+                onClick={() => setIsSidebarOpen(false)}
+              >
+                <span style={{fontSize: '20px'}}>✕</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {currentMenu.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setIsSidebarOpen(false);
+                  }}
+                  className={`
+                    w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+                    ${activeTab === item.id 
+                      ? 'bg-[var(--blue)] text-white shadow-lg' 
+                      : 'hover:bg-[var(--bg)] text-[var(--gray)]'}
+                  `}
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  <span className="font-medium">{item.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="p-4 border-t border-[var(--border)] space-y-2">
+              <button 
+                onClick={() => setIsDark(!isDark)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[var(--bg)] text-[var(--gray)] transition-all"
+              >
+                <span>{isDark ? '☀️' : '🌙'}</span>
+                <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
+              <div className="flex items-center gap-3 px-4 py-3 text-[var(--gray)]">
+                <div className="w-8 h-8 rounded-full bg-[var(--blue)] flex items-center justify-center text-white font-bold">
+                  {userProfile?.name?.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold truncate">{userProfile?.name}</div>
+                  <div className="text-xs truncate opacity-70 uppercase">{userProfile?.role?.replace('_', ' ')}</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
     </>
   );
 };
@@ -476,6 +518,7 @@ function App() {
 
   return (
     <div className={`flex min-h-screen bg-[var(--bg)] text-[var(--text)] ${isDark ? 'dark' : ''}`}>
+      {/* Desktop Sidebar */}
       <Sidebar 
         userProfile={userProfile} 
         activeTab={activeTab} 
@@ -487,8 +530,8 @@ function App() {
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile Menu Toggle - Fixed and Improved */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[var(--card)] border-b border-[var(--border)] z-[50] flex items-center justify-between px-4 shadow-sm backdrop-blur-md bg-opacity-90">
+        {/* Mobile Header - Only on Mobile */}
+        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[var(--card)] border-b border-[var(--border)] z-[80] flex items-center justify-between px-4 shadow-sm">
           <button 
             className="w-10 h-10 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-all active:scale-90"
             onClick={() => setIsSidebarOpen(true)}
@@ -506,8 +549,8 @@ function App() {
           </button>
         </div>
 
-        {/* Main Content Area - Added padding-top for mobile header */}
-        <main className={`flex-1 overflow-y-auto p-4 md:p-8 pt-16 md:pt-8 transition-all duration-300`}>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 pt-20 md:pt-8">
           <div className="max-w-7xl mx-auto pb-16">
             <AppContent 
               userProfile={userProfile} 
