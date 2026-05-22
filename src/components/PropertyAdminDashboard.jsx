@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../AuthContext';  // ✅ Fixed: Changed from './AuthContext' to '../AuthContext'
 import { exportToPDF } from '../utils/pdfExport';
 
 export default function PropertyAdminDashboard() {
@@ -61,8 +61,8 @@ export default function PropertyAdminDashboard() {
         .eq('admin_id', adminId);
 
       const payments = paymentsResult.data || [];
-      const confirmed = payments.filter(p => p.status === 'Confirmed').reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
-      const pending = payments.filter(p => p.status === 'Pending').reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
+      const confirmed = payments.filter(p => p.status === 'Confirmed').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) || 0;
+      const pending = payments.filter(p => p.status === 'Pending').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) || 0;
 
       // 5. Fetch Announcements
       const announcementsResult = await supabase
@@ -80,14 +80,7 @@ export default function PropertyAdminDashboard() {
         occupancy: { total: count || 0, limit: subData?.tenant_limit || 50 }
       });
       
-      if (tenantList && tenantList.length > 0) {
-        console.log('✅ Setting tenants:', tenantList);
-        setTenants(tenantList);
-      } else {
-        console.log('⚠️ No tenants found');
-        setTenants([]);
-      }
-      
+      setTenants(tenantList || []);
       setAnnouncements(announcementsList);
     } catch (error) {
       console.error('❌ Dashboard error:', error);
@@ -97,119 +90,220 @@ export default function PropertyAdminDashboard() {
   }
 
   const downloadTenantPDF = () => {
-    const headers = ['Name', 'House/Unit', 'Rent Amount', 'Payment Status'];
-    const data = tenants.map(t => [
-      t.name,
-      t.house || 'N/A',
-      `KSh ${parseFloat(t.rent).toLocaleString()}`,
-      t.status?.toUpperCase() || 'GOOD'
-    ]);
-    exportToPDF({
-      title: 'Property Tenant Records',
-      filename: 'My_Tenants_List',
-      headers,
-      data,
-      subtitle: `Property Manager: ${userProfile?.name} | Total Tenants: ${tenants.length}`
-    });
+    try {
+      if (tenants.length === 0) {
+        alert('No tenants to export');
+        return;
+      }
+      
+      const headers = ['Name', 'House/Unit', 'Rent Amount', 'Payment Status'];
+      const data = tenants.map(t => [
+        t.name || 'N/A',
+        t.house || 'N/A',
+        `KSh ${parseFloat(t.rent || 0).toLocaleString()}`,
+        t.status?.toUpperCase() || 'GOOD'
+      ]);
+      
+      const success = exportToPDF({
+        title: 'Property Tenant Records',
+        filename: 'My_Tenants_List',
+        headers,
+        data,
+        subtitle: `Property Manager: ${userProfile?.name} | Total Tenants: ${tenants.length}`
+      });
+      
+      if (success) {
+        console.log('PDF generated successfully');
+      }
+    } catch (error) {
+      console.error('PDF export error:', error);
+      alert('Failed to download PDF. Please try again.');
+    }
   };
 
-  if (loading) return <div className="card" style={{textAlign: 'center', padding: '40px'}}>Loading Dashboard...</div>;
+  if (loading) {
+    return (
+      <div className="card flex items-center justify-center" style={{ minHeight: '200px' }}>
+        <div className="animate-pulse text-muted font-medium">Loading Dashboard...</div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12}}>
-        <h2 style={{margin: 0}}>Property Admin Dashboard</h2>
+    <div className="animate-fadeIn">
+      {/* Page Header */}
+      <div className="page-header">
+        <h1 className="page-title">Property Admin Dashboard</h1>
         {tenants.length > 0 && (
-          <button onClick={downloadTenantPDF} className="btn" style={{background: 'var(--red)', color: 'white', display: 'flex', alignItems: 'center', gap: 8}}>
-            📄 Download Tenant PDF
+          <button onClick={downloadTenantPDF} className="btn btn-danger">
+            <i className="fas fa-file-pdf"></i>
+            Download Tenant PDF
           </button>
         )}
       </div>
 
-      {/* Subscription Info */}
-      <div className="card" style={{marginBottom: 24, borderLeft: '4px solid var(--blue)'}}>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+      {/* Subscription Card */}
+      <div className="card mb-6" style={{ borderLeft: '4px solid var(--primary)' }}>
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h3 style={{margin: '0 0 4px 0'}}>Subscription</h3>
-            <p style={{margin: 0, color: 'var(--gray)'}}>
-              {stats.subscription?.subscription_plan || 'N/A'} • {stats.subscription?.subscription_status || 'N/A'} • Due: {stats.subscription?.subscription_due || 'N/A'}
+            <h3 className="font-semibold text-base mb-1 m-0">Subscription</h3>
+            <p className="text-muted text-sm m-0">
+              {stats.subscription?.subscription_plan || 'N/A'} •{' '}
+              <span className={`badge ${
+                stats.subscription?.subscription_status === 'Active' ? 'badge-success' : 'badge-warning'
+              }`}>
+                {stats.subscription?.subscription_status || 'N/A'}
+              </span>{' '}
+              • Due: {stats.subscription?.subscription_due || 'N/A'}
             </p>
           </div>
-          <div style={{textAlign: 'right'}}>
-            <p style={{margin: 0, fontSize: '24px', fontWeight: 'bold', color: 'var(--blue)'}}>
-              {stats.subscription?.subscription_fee || 'KSh 0'}
+          <div className="text-right">
+            <p className="text-2xl font-bold text-primary m-0">
+              KSh {(stats.subscription?.subscription_fee || 0).toLocaleString()}
             </p>
-            <p style={{margin: 0, fontSize: '12px'}}>Monthly Fee</p>
+            <p className="text-xs text-muted m-0">Monthly Fee</p>
           </div>
         </div>
       </div>
 
-      {/* Revenue Grid */}
-      <div className="grid" style={{marginBottom: 24}}>
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: '14px'}}>Revenue (Confirmed)</h3>
-          <p style={{fontSize: '32px', fontWeight: '700', margin: 0, color: 'var(--green)'}}>
-            KSh {stats.revenue.confirmed.toLocaleString()}
-          </p>
-        </div>
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: '14px'}}>Pending</h3>
-          <p style={{fontSize: '32px', fontWeight: '700', margin: 0, color: 'var(--amber)'}}>
-            KSh {stats.revenue.pending.toLocaleString()}
-          </p>
-        </div>
-        <div className="card">
-          <h3 style={{margin: '0 0 8px 0', color: 'var(--gray)', fontSize: '14px'}}>Occupancy</h3>
-          <p style={{fontSize: '32px', fontWeight: '700', margin: 0}}>
-            {stats.occupancy.total} / {stats.occupancy.limit}
-          </p>
-          <p style={{fontSize: '12px', color: 'var(--gray)'}}>Units Occupied</p>
-        </div>
-      </div>
-
-      {/* Announcements */}
-      {announcements.length > 0 && (
-        <div className="card" style={{marginBottom: 24}}>
-          <h3 style={{margin: '0 0 12px 0'}}>📢 System Announcements</h3>
-          {announcements.map(a => (
-            <div key={a.id} style={{marginBottom: 8}}>
-              <span style={{fontWeight: 'bold'}}>{a.subject}</span> <span className="badge">{a.priority}</span>
-              <p style={{margin: '4px 0 0 0'}}>{a.message}</p>
+      {/* Revenue & Occupancy Grid */}
+      <div className="stats-grid mb-6">
+        {/* Confirmed Revenue */}
+        <div className="stat-card success">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Revenue (Confirmed)</div>
+              <div className="stat-value text-success">
+                KSh {stats.revenue.confirmed.toLocaleString()}
+              </div>
             </div>
-          ))}
+            <div className="stat-icon green">
+              <i className="fas fa-wallet"></i>
+            </div>
+          </div>
+          <div className="stat-subtitle">Total collected this month</div>
+        </div>
+
+        {/* Pending Revenue */}
+        <div className="stat-card warning">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Pending</div>
+              <div className="stat-value text-warning">
+                KSh {stats.revenue.pending.toLocaleString()}
+              </div>
+            </div>
+            <div className="stat-icon orange">
+              <i className="fas fa-clock"></i>
+            </div>
+          </div>
+          <div className="stat-subtitle">Awaiting payment</div>
+        </div>
+
+        {/* Occupancy */}
+        <div className="stat-card">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Occupancy</div>
+              <div className="stat-value">
+                {stats.occupancy.total} / {stats.occupancy.limit}
+              </div>
+            </div>
+            <div className="stat-icon purple">
+              <i className="fas fa-home"></i>
+            </div>
+          </div>
+          <div className="stat-subtitle">
+            Units Occupied ({stats.occupancy.limit > 0 
+              ? Math.round((stats.occupancy.total / stats.occupancy.limit) * 100) 
+              : 0}%)
+          </div>
+        </div>
+      </div>
+
+      {/* Announcements Section */}
+      {announcements.length > 0 && (
+        <div className="card mb-6">
+          <div className="card-header">
+            <i className="fas fa-bullhorn text-primary"></i>
+            <h2 className="card-title">System Announcements</h2>
+          </div>
+          <div className="announcement-list">
+            {announcements.map(a => (
+              <div 
+                key={a.id} 
+                className={`announcement-item ${a.priority === 'High' ? 'important' : ''}`}
+              >
+                <div className="announcement-header">
+                  <span className="announcement-title">{a.subject}</span>
+                  {a.priority && (
+                    <span className={`badge ${
+                      a.priority === 'High' ? 'badge-danger' : 
+                      a.priority === 'Medium' ? 'badge-warning' : 'badge-info'
+                    }`}>
+                      {a.priority}
+                    </span>
+                  )}
+                </div>
+                <p className="announcement-text">{a.message}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Tenants List */}
+      {/* Tenants Table */}
       <div className="card">
-        <h3 style={{margin: '0 0 16px 0'}}>Your Tenants</h3>
+        <div className="card-header">
+          <i className="fas fa-users text-primary"></i>
+          <h2 className="card-title">Your Tenants</h2>
+        </div>
+        
         {tenants.length === 0 ? (
-          <p style={{color: 'var(--gray)'}}>No tenants added yet.</p>
+          <div className="text-center py-8">
+            <i className="fas fa-user-slash text-muted" style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block' }}></i>
+            <p className="text-muted">No tenants added yet.</p>
+            <a href="#add-property" className="btn btn-primary btn-sm mt-4">
+              <i className="fas fa-plus"></i> Add Your First Tenant
+            </a>
+          </div>
         ) : (
-          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse'}}>
-            <thead>
-              <tr style={{borderBottom: '2px solid var(--border)'}}>
-                <th style={{padding: '8px 0'}}>Name</th>
-                <th>House</th>
-                <th>Rent</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map(t => (
-                <tr key={t.id} style={{borderBottom: '1px solid var(--border)'}}>
-                  <td style={{padding: '12px 0'}}>{t.name}</td>
-                  <td>{t.house}</td>
-                  <td>KSh {t.rent}</td>
-                  <td>
-                    <span className={`badge ${t.status === 'good' ? 'status-green' : t.status === 'pending' ? 'status-amber' : 'status-red'}`}>
-                      {t.status?.toUpperCase() || 'GOOD'}
-                    </span>
-                  </td>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>House</th>
+                  <th>Rent</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {tenants.map(t => (
+                  <tr key={t.id} className="transition">
+                    <td className="font-semibold">{t.name}</td>
+                    <td>
+                      <span className="badge badge-info">{t.house || 'N/A'}</span>
+                    </td>
+                    <td className="text-success font-bold">
+                      KSh {parseFloat(t.rent || 0).toLocaleString()}
+                    </td>
+                    <td>
+                      <span className={`badge ${
+                        t.status === 'good' || !t.status 
+                          ? 'badge-success' 
+                          : t.status === 'pending' 
+                            ? 'badge-warning' 
+                            : 'badge-danger'
+                      }`}>
+                        {t.status?.toUpperCase() || 'GOOD'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

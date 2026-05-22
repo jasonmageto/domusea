@@ -1,103 +1,89 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { toast } from 'react-hot-toast';
 
 export default function PropertyModeration() {
   const { userProfile } = useAuth();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [moderationNotes, setModerationNotes] = useState('');
-  const [logs, setLogs] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchProperties();
   }, [filter]);
 
- const fetchProperties = async () => {
-  try {
-    setRefreshing(true);
-    console.log('🔍 Fetching properties for Supreme Admin...');
-    
-    // 🔥 Simplified query - NO admins relationship
-    let query = supabase
-      .from('properties')
-      .select('*')  // Just fetch properties, no joins
-      .order('created_at', { ascending: false });
-
-    // Apply status filter ONLY if explicitly selected
-    if (filter === 'pending') {
-      query = query.eq('moderation_status', 'pending');
-    } else if (filter === 'approved') {
-      query = query.eq('moderation_status', 'approved');
-    } else if (filter === 'rejected') {
-      query = query.eq('moderation_status', 'rejected');
-    }
-
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('❌ Error fetching properties:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      toast.error('Failed to load properties: ' + error.message);
-      setProperties([]);
-      return;
-    }
-    
-    console.log('✅ Properties fetched:', data?.length || 0);
-    
-    // 🔥 If we have properties, fetch admin names separately
-    if (data && data.length > 0) {
-      const propertiesWithAdmins = await Promise.all(
-        data.map(async (prop) => {
-          if (prop.property_manager_id) {
-            const {  admin } = await supabase
-              .from('admins')
-              .select('name, email')
-              .eq('id', prop.property_manager_id)
-              .single();
-            
-            return { ...prop, admins: admin };
-          }
-          return prop;
-        })
-      );
-      setProperties(propertiesWithAdmins);
-    } else {
-      setProperties(data || []);
-    }
-    
-  } catch (error) {
-    console.error('❌ Error:', error);
-    toast.error('Failed to load properties');
-    setProperties([]);
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
-
-  const fetchModerationLogs = async (propertyId) => {
+  const fetchProperties = async () => {
     try {
-      const { data, error } = await supabase
-        .from('property_moderation_logs')
-        .select('*')
-        .eq('property_id', propertyId)
-        .order('created_at', { ascending: false });
+      setRefreshing(true);
+      setLoading(true);
+      setError(null);
+      console.log('🔍 Fetching properties for moderation...');
       
-      if (error) throw error;
-      setLogs(data || []);
-    } catch (error) {
-      console.error('Error fetching logs:', error);
+      // Build base query
+      let query = supabase
+        .from('properties')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      // Apply status filter
+      if (filter !== 'all') {
+        query = query.eq('moderation_status', filter);
+      }
+
+      // Execute query
+      const { data, error: queryError } = await query;
+      
+      if (queryError) {
+        console.error('❌ Database error:', queryError);
+        throw queryError;
+      }
+      
+      console.log('✅ Properties fetched:', data?.length || 0);
+      
+      // If we have properties, try to fetch admin details separately
+      let propertiesWithAdmins = data || [];
+      
+      if (data && data.length > 0) {
+        propertiesWithAdmins = await Promise.all(
+          data.map(async (prop) => {
+            if (prop.property_manager_id) {
+              try {
+                // ✅ FIXED: Correct destructuring { data: admin }
+                const { data: admin, error: adminError } = await supabase
+                  .from('admins')
+                  .select('name, email')
+                  .eq('id', prop.property_manager_id)
+                  .maybeSingle();
+                
+                if (!adminError && admin) {
+                  return { ...prop, admins: admin };
+                }
+              } catch (err) {
+                console.warn('Could not fetch admin for property:', prop.id);
+              }
+            }
+            return prop;
+          })
+        );
+      }
+      
+      setProperties(propertiesWithAdmins);
+      
+    } catch (err) {
+      console.error('❌ Error fetching properties:', err);
+      setError(err.message || 'Failed to load properties');
+      setProperties([]);
+    } finally {
+      // ✅ CRITICAL: Always stop loading
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -122,14 +108,14 @@ export default function PropertyModeration() {
 
       if (error) throw error;
 
-      toast.success(`Property ${action} successfully`);
+      alert(`Property ${action} successfully`);
       fetchProperties();
       setShowModal(false);
       setSelectedProperty(null);
       setModerationNotes('');
-    } catch (error) {
-      console.error('Error moderating property:', error);
-      toast.error('Failed to moderate property');
+    } catch (err) {
+      console.error('Error moderating property:', err);
+      alert('Failed to moderate property: ' + err.message);
     }
   };
 
@@ -146,15 +132,14 @@ export default function PropertyModeration() {
         .eq('id', propertyId);
 
       if (error) throw error;
-      toast.success(`Property ${!currentVisibility ? 'made visible' : 'hidden'}`);
+      alert(`Property ${!currentVisibility ? 'made visible' : 'hidden'}`);
       fetchProperties();
-    } catch (error) {
-      console.error('Error toggling visibility:', error);
-      toast.error('Failed to update visibility');
+    } catch (err) {
+      console.error('Error toggling visibility:', err);
+      alert('Failed to update visibility');
     }
   };
 
-  // 🔥 NEW: Delete property permanently
   const deleteProperty = async (propertyId, propertyName) => {
     if (!window.confirm(`Are you sure you want to DELETE "${propertyName}"? This cannot be undone.`)) {
       return;
@@ -168,12 +153,12 @@ export default function PropertyModeration() {
 
       if (error) throw error;
 
-      toast.success(`Property "${propertyName}" deleted successfully`);
+      alert(`Property "${propertyName}" deleted successfully`);
       fetchProperties();
       setShowDeleteConfirm(null);
-    } catch (error) {
-      console.error('Error deleting property:', error);
-      toast.error('Failed to delete property');
+    } catch (err) {
+      console.error('Error deleting property:', err);
+      alert('Failed to delete property');
     }
   };
 
@@ -181,11 +166,9 @@ export default function PropertyModeration() {
     setSelectedProperty(property);
     setModerationNotes(property.moderation_notes || '');
     setShowModal(true);
-    fetchModerationLogs(property.id);
   };
 
   const getStatusBadge = (status) => {
-    // Handle NULL or undefined status
     const statusKey = status?.toLowerCase() || 'pending';
     
     const badges = {
@@ -194,15 +177,12 @@ export default function PropertyModeration() {
       rejected: { color: '#ef4444', label: '❌ Rejected' },
       suspended: { color: '#6b7280', label: '⚠️ Suspended' }
     };
+    
     const badge = badges[statusKey] || badges.pending;
     return (
-      <span style={{
-        padding: '4px 12px',
-        borderRadius: '12px',
+      <span className="badge" style={{
         background: badge.color,
-        color: 'white',
-        fontSize: '12px',
-        fontWeight: '600'
+        color: 'white'
       }}>
         {badge.label}
       </span>
@@ -217,26 +197,48 @@ export default function PropertyModeration() {
     total: properties.length
   };
 
+  // Loading state
   if (loading) {
     return (
-      <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-        <div>Loading properties for review...</div>
+      <div className="card flex flex-col items-center justify-center" style={{ minHeight: '300px', padding: '40px' }}>
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mb-4"></div>
+        <p className="text-muted text-lg">Loading properties for review...</p>
+        <p className="text-muted text-sm mt-2">This may take a moment</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="card p-6 text-center" style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+        <h3 className="text-xl font-bold text-danger mb-2">Error Loading Properties</h3>
+        <p className="text-muted mb-4" style={{ maxWidth: '400px' }}>{error}</p>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={fetchProperties} className="btn btn-primary">
+            🔄 Try Again
+          </button>
+          <button onClick={() => { setFilter('all'); fetchProperties(); }} className="btn btn-secondary">
+            Clear Filters
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="animate-fadeIn">
+      {/* Header */}
       <div style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '12px' }}>
           <h2 style={{ margin: 0, fontSize: '28px', fontWeight: '600' }}>
             🛡️ Property Moderation
           </h2>
           <button 
             onClick={fetchProperties}
             disabled={refreshing}
-            className="btn"
+            className="btn btn-secondary"
             style={{ padding: '8px 16px', fontSize: '14px' }}
           >
             {refreshing ? '🔄 Refreshing...' : '🔄 Refresh'}
@@ -247,34 +249,54 @@ export default function PropertyModeration() {
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <div className="card" style={{ borderLeft: '4px solid #f59e0b' }}>
-          <div style={{ fontSize: '13px', color: 'var(--gray)', marginBottom: '4px' }}>Pending Review</div>
-          <div style={{ fontSize: '28px', fontWeight: '700' }}>{stats.pending}</div>
+      {/* Stats Cards */}
+      <div className="stats-grid" style={{ marginBottom: '24px' }}>
+        <div className="stat-card warning">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Pending Review</div>
+              <div className="stat-value text-warning">{stats.pending}</div>
+            </div>
+            <div className="stat-icon orange"><i className="fas fa-clock"></i></div>
+          </div>
         </div>
-        <div className="card" style={{ borderLeft: '4px solid #10b981' }}>
-          <div style={{ fontSize: '13px', color: 'var(--gray)', marginBottom: '4px' }}>Approved</div>
-          <div style={{ fontSize: '28px', fontWeight: '700' }}>{stats.approved}</div>
+        <div className="stat-card success">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Approved</div>
+              <div className="stat-value text-success">{stats.approved}</div>
+            </div>
+            <div className="stat-icon green"><i className="fas fa-check-circle"></i></div>
+          </div>
         </div>
-        <div className="card" style={{ borderLeft: '4px solid #ef4444' }}>
-          <div style={{ fontSize: '13px', color: 'var(--gray)', marginBottom: '4px' }}>Rejected</div>
-          <div style={{ fontSize: '28px', fontWeight: '700' }}>{stats.rejected}</div>
+        <div className="stat-card danger">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Rejected</div>
+              <div className="stat-value text-danger">{stats.rejected}</div>
+            </div>
+            <div className="stat-icon red"><i className="fas fa-times-circle"></i></div>
+          </div>
         </div>
-        <div className="card" style={{ borderLeft: '4px solid #3b82f6' }}>
-          <div style={{ fontSize: '13px', color: 'var(--gray)', marginBottom: '4px' }}>Total Properties</div>
-          <div style={{ fontSize: '28px', fontWeight: '700' }}>{stats.total}</div>
+        <div className="stat-card">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Total Properties</div>
+              <div className="stat-value">{stats.total}</div>
+            </div>
+            <div className="stat-icon blue"><i className="fas fa-building"></i></div>
+          </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card" style={{ marginBottom: '24px', padding: '16px' }}>
+      <div className="card mb-6" style={{ padding: '16px' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {['all', 'pending', 'approved', 'rejected'].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`btn ${filter === f ? 'btn-primary' : ''}`}
+              className={`btn ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
               style={{ textTransform: 'capitalize' }}
             >
               {f} {f === 'all' ? `(${stats.total})` : f === 'pending' ? `(${stats.pending})` : f === 'approved' ? `(${stats.approved})` : `(${stats.rejected})`}
@@ -283,14 +305,17 @@ export default function PropertyModeration() {
         </div>
       </div>
 
-      {/* Properties List */}
+      {/* Properties Table */}
       <div className="card">
         {properties.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--gray)' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
-            <p>No properties found</p>
+            <p style={{ fontSize: '18px', marginBottom: '8px' }}>No properties found</p>
+            <p style={{ fontSize: '14px', marginBottom: '16px' }}>
+              {filter !== 'all' ? `No ${filter} properties` : 'Properties will appear here once submitted'}
+            </p>
             {filter !== 'all' && (
-              <button onClick={() => setFilter('all')} className="btn btn-sm" style={{ marginTop: 12 }}>
+              <button onClick={() => setFilter('all')} className="btn btn-sm">
                 View All Properties
               </button>
             )}
@@ -334,7 +359,7 @@ export default function PropertyModeration() {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                           <input
                             type="checkbox"
-                            checked={property.is_visible_on_map}
+                            checked={property.is_visible_on_map || false}
                             onChange={() => toggleVisibility(property.id, property.is_visible_on_map)}
                             style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                           />
@@ -412,7 +437,7 @@ export default function PropertyModeration() {
             <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
               <h4 style={{ margin: '0 0 12px 0' }}>{selectedProperty.name}</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '14px' }}>
-                <div><strong>Manager:</strong> {selectedProperty.admins?.name}</div>
+                <div><strong>Manager:</strong> {selectedProperty.admins?.name || 'Unknown'}</div>
                 <div><strong>Location:</strong> {selectedProperty.city}</div>
                 <div><strong>Total Units:</strong> {selectedProperty.total_units}</div>
                 <div><strong>Vacant:</strong> {selectedProperty.vacant_units}</div>
@@ -431,7 +456,7 @@ export default function PropertyModeration() {
                   onChange={(e) => setModerationNotes(e.target.value)}
                   placeholder="Add notes about this decision..."
                   rows={3}
-                  style={{ width: '100%', marginBottom: '12px' }}
+                  style={{ width: '100%', marginBottom: '12px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }}
                 />
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
@@ -452,39 +477,13 @@ export default function PropertyModeration() {
               </div>
             )}
 
-            {logs.length > 0 && (
-              <div>
-                <h4 style={{ margin: '0 0 12px 0' }}>📜 Moderation History</h4>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {logs.map((log) => (
-                    <div key={log.id} style={{
-                      padding: '12px',
-                      background: 'var(--bg)',
-                      borderRadius: '6px',
-                      marginBottom: '8px',
-                      fontSize: '13px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <strong>{log.action}</strong>
-                        <span style={{ color: 'var(--gray)' }}>
-                          {new Date(log.created_at).toLocaleString()}
-                        </span>
-                      </div>
-                      <div style={{ color: 'var(--gray)' }}>By: {log.moderated_by_name}</div>
-                      {log.notes && <div style={{ marginTop: '4px', fontStyle: 'italic' }}>"{log.notes}"</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <button
               onClick={() => {
                 setShowModal(false);
                 setSelectedProperty(null);
                 setModerationNotes('');
               }}
-              className="btn"
+              className="btn btn-secondary"
               style={{ marginTop: '20px', width: '100%' }}
             >
               Close
@@ -518,7 +517,7 @@ export default function PropertyModeration() {
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={() => setShowDeleteConfirm(null)}
-                className="btn"
+                className="btn btn-secondary"
                 style={{ flex: 1 }}
               >
                 Cancel
