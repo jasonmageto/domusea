@@ -16,31 +16,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const checkTenantPasswordStatus = useCallback(async (user) => {
-    if (user?.user_metadata?.role === 'tenant') {
-      try {
-        const { data: tenant, error } = await supabase
-          .from('tenants')
-          .select('password_changed')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          console.error('Error checking password status:', error);
-          return;
-        }
-
-        if (tenant && !tenant.password_changed) {
-          window.location.href = '/#change-password?first_login=true';
-        }
-      } catch (error) {
-        console.error('Error checking password status:', error);
-      }
-    }
-  }, []);
-
   const fetchUserProfile = useCallback(async (user) => {
-    console.log('🔍 [AUTH] Fetching profile for:', user.email, user.id);
+    console.log('🔍 [AUTH] Fetching profile for:', user.email);
     setError(null);
 
     try {
@@ -63,24 +40,14 @@ export const AuthProvider = ({ children }) => {
 
       // ✅ CHECK 2: Property Admin
       console.log('🔍 [AUTH] Checking admins table...');
-      let { data: admin, error: adminError } = await supabase
+      const { data: admin, error: adminError } = await supabase
         .from('admins')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!admin && !adminError) {
-        const emailResult = await supabase
-          .from('admins')
-          .select('*')
-          .eq('email', user.email)
-          .maybeSingle();
-        admin = emailResult.data;
-        adminError = emailResult.error;
-      }
-
       if (admin && !adminError) {
-        console.log('✅ [AUTH] Admin found:', admin.name);
+        console.log('✅ [AUTH] Property Admin found:', admin.name);
         
         if (admin.frozen === true || admin.subscription_status === 'Overdue') {
           console.log('🚫 [AUTH] Admin account frozen/overdue');
@@ -92,7 +59,7 @@ export const AuthProvider = ({ children }) => {
           id: admin.id,
           name: admin.name || user.email.split('@')[0],
           email: admin.email || user.email,
-          role: 'admin',
+          role: 'admin', // ✅ CRITICAL: Must be 'admin' not 'supreme_admin'
           frozen: admin.frozen,
           subscription_status: admin.subscription_status,
           subscription_due: admin.subscription_due,
@@ -101,78 +68,22 @@ export const AuthProvider = ({ children }) => {
           admin_id: admin.id
         };
         
+        console.log('🎯 [AUTH] Role assigned:', profile.role);
         setUserProfile(profile);
         setLoading(false);
-        await checkTenantPasswordStatus(user);
         return profile;
       }
 
-      // ✅ CHECK 3: Tenant - SIMPLIFIED QUERY (No complex joins initially)
-      console.log('🔍 [AUTH] Checking tenants table for ID:', user.id);
-      
-      // First try: Simple query by ID without joins
-      let { data: tenant, error: tenantError } = await supabase
+      // ✅ CHECK 3: Tenant
+      console.log('🔍 [AUTH] Checking tenants table...');
+      const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
-        .select('*')  // Simple select first
+        .select('*')
         .eq('id', user.id)
         .maybeSingle();
 
-      console.log('[AUTH] Tenant query by ID result:', { 
-        found: !!tenant, 
-        error: tenantError?.message,
-        hasData: !!tenant 
-      });
-
-      // If not found by ID, try by email
-      if (!tenant && !tenantError) {
-        console.log('⚠️ [AUTH] Tenant not found by ID, trying email:', user.email);
-        const emailResult = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('email', user.email)
-          .maybeSingle();
-        
-        tenant = emailResult.data;
-        tenantError = emailResult.error;
-        
-        console.log('[AUTH] Tenant query by email result:', { 
-          found: !!tenant, 
-          error: tenantError?.message 
-        });
-      }
-
       if (tenant && !tenantError) {
         console.log('✅ [AUTH] Tenant found:', tenant.name);
-        
-        // Now check admin status separately (avoid complex joins)
-        let adminFrozen = false;
-        let adminSubscriptionStatus = null;
-        
-        if (tenant.admin_id) {
-          try {
-            const { data: adminData } = await supabase
-              .from('admins')
-              .select('frozen, subscription_status')
-              .eq('id', tenant.admin_id)
-              .maybeSingle();
-            
-            adminFrozen = adminData?.frozen || false;
-            adminSubscriptionStatus = adminData?.subscription_status;
-            
-            console.log('[AUTH] Admin status check:', { 
-              adminFrozen, 
-              adminSubscriptionStatus 
-            });
-          } catch (adminErr) {
-            console.warn('[AUTH] Could not check admin status:', adminErr);
-          }
-        }
-
-        if (adminFrozen || adminSubscriptionStatus === 'Overdue') {
-          console.log('🚫 [AUTH] Tenant blocked - admin frozen/overdue');
-          await supabase.auth.signOut();
-          throw new Error('ACCOUNT_FROZEN_BY_ADMIN');
-        }
 
         const profile = {
           id: tenant.id,
@@ -187,44 +98,33 @@ export const AuthProvider = ({ children }) => {
           status: tenant.status
         };
         
-        console.log('✅ [AUTH] Setting tenant profile');
+        console.log('🎯 [AUTH] Role assigned:', profile.role);
         setUserProfile(profile);
         setLoading(false);
-        await checkTenantPasswordStatus(user);
         return profile;
       }
 
       // ✅ CHECK 4: No profile found
-      console.error('❌ [AUTH] No profile found in any table');
-      console.log('User ID:', user.id);
-      console.log('User Email:', user.email);
-      console.log('Admin error:', adminError?.message);
-      console.log('Tenant error:', tenantError?.message);
-      
+      console.error('❌ [AUTH] No profile found');
       setUserProfile(null);
-      setError(`No account found for ${user.email}. Please contact support.`);
+      setError(`No account found for ${user.email}`);
       setLoading(false);
-      
-      setTimeout(async () => {
-        await supabase.auth.signOut();
-      }, 2000);
-      
-      throw new Error(`No account found. User exists in Auth but not in database.`);
+      throw new Error('No account found');
 
     } catch (err) {
-      console.error('❌ [AUTH] Error in fetchUserProfile:', err);
+      console.error('❌ [AUTH] Error:', err);
       setUserProfile(null);
       setError(err.message);
       setLoading(false);
       throw err;
     }
-  }, [checkTenantPasswordStatus]);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
     const handleAuthState = async (event, session) => {
-      console.log('📡 [AUTH] State changed:', event, session?.user?.email);
+      console.log('📡 [AUTH] State changed:', event);
       
       if (!mounted) return;
       
@@ -240,25 +140,15 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthState);
 
     const checkSession = async () => {
-      console.log('🔄 [AUTH] Checking initial session...');
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('❌ [AUTH] Session error:', sessionError);
-          if (mounted) setLoading(false);
-          return;
-        }
-
+        const { data: { session } } = await supabase.auth.getSession();
         if (mounted && session?.user) {
-          console.log('✅ [AUTH] Found session:', session.user.email);
           await fetchUserProfile(session.user);
-        } else {
-          console.log('ℹ️ [AUTH] No session');
-          if (mounted) setLoading(false);
+        } else if (mounted) {
+          setLoading(false);
         }
       } catch (err) {
-        console.error('❌ [AUTH] Session check error:', err);
+        console.error('❌ [AUTH] Session error:', err);
         if (mounted) setLoading(false);
       }
     };
@@ -266,7 +156,6 @@ export const AuthProvider = ({ children }) => {
     checkSession();
 
     return () => {
-      console.log('🧹 [AUTH] Cleaning up');
       mounted = false;
       subscription?.unsubscribe();
     };
@@ -283,26 +172,10 @@ export const AuthProvider = ({ children }) => {
         password
       });
 
-      if (authError) {
-        console.error('❌ [AUTH] Auth error:', authError);
-        
-        if (authError.message?.includes('Invalid login credentials') || authError.status === 400) {
-          throw new Error('Invalid email or password');
-        }
-        if (authError.message?.includes('Email not confirmed')) {
-          throw new Error('Please confirm your email address');
-        }
-        
-        throw authError;
-      }
-      
-      if (!user) {
-        throw new Error('Login failed - no user returned');
-      }
+      if (authError) throw authError;
+      if (!user) throw new Error('Login failed');
 
-      console.log('✅ [AUTH] Auth successful, fetching profile...');
       await fetchUserProfile(user);
-      console.log('✅ [AUTH] Login complete');
       return user;
       
     } catch (err) {
@@ -315,7 +188,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
-      console.log('👋 [AUTH] Logging out');
       await supabase.auth.signOut();
       setUserProfile(null);
       setError(null);
@@ -324,21 +196,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const refreshProfile = useCallback(async () => {
-    console.log('🔄 [AUTH] Refreshing profile');
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      await fetchUserProfile(session.user);
-    }
-  }, [fetchUserProfile]);
-
   const value = {
     userProfile,
     loading,
     error,
     login,
-    logout,
-    refreshProfile
+    logout
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

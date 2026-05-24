@@ -1,429 +1,476 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
+import './styles/global.css';
 
-// Existing Components
+// ==========================================
+// COMPONENT IMPORTS - SUPREME ADMIN
+// ==========================================
 import SADashboard from './components/SADashboard';
 import ManageAdmins from './components/ManageAdmins';
+import PropertyModeration from './components/PropertyModeration';
+import SASubscriptions from './components/SASubscriptions';
+import SARevenueAnalytics from './components/SARevenueAnalytics';
+import SAPayments from './components/SAPayments';
+import SAAnnouncements from './components/SAAnnouncements';
+import PropertyMap from './components/PropertyMap';
+import Messages from './components/Messages';
+
+// ==========================================
+// COMPONENT IMPORTS - PROPERTY ADMIN
+// ==========================================
 import PropertyAdminDashboard from './components/PropertyAdminDashboard';
+import AddPropertyForm from './components/AddPropertyForm';
 import ManageTenants from './components/ManageTenants';
 import OccupancyGrid from './components/OccupancyGrid';
-import AdminPaymentMethods from './components/AdminPaymentMethods';
-import ComplaintsManager from './components/ComplaintsManager';
 import AdminPaymentsManager from './components/AdminPaymentsManager';
+import AdminRevenueAnalytics from './components/AdminRevenueAnalytics';
+import ComplaintsManager from './components/ComplaintsManager';
+
+// ==========================================
+// COMPONENT IMPORTS - TENANT
+// ==========================================
+import TenantDashboard from './components/TenantDashboard';
 import TenantPayRent from './components/TenantPayRent';
 import TenantPaymentHistory from './components/TenantPaymentHistory';
 import TenantRequests from './components/TenantRequests';
 import TenantSettings from './components/TenantSettings';
-import TenantDashboard from './components/TenantDashboard';
-import Messages from './components/Messages';
-import SASubscriptions from './components/SASubscriptions';
-import SAPayments from './components/SAPayments';
-import SAAnnouncements from './components/SAAnnouncements';
-import SARevenueAnalytics from './components/SARevenueAnalytics';
-import AdminRevenueAnalytics from './components/AdminRevenueAnalytics';
-import Footer from './components/Footer';
 
-// Map & Property Components
-import PropertySearch from './components/PropertySearch';
-import PropertyMap from './components/PropertyMap';
-import AddPropertyForm from './components/AddPropertyForm';
-import PropertyModeration from './components/PropertyModeration';
+// ==========================================
+// COMPONENT IMPORTS - AUTH & UI
+// ==========================================
+import LoginScreen from './components/LoginScreen';
 
-// --- RESTORED HIGH-END LOGIN SCREEN ---
-const LoginScreen = ({ isDark }) => {
-  const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+// ==========================================
+// SUBSCRIPTION EXPIRED COMPONENT
+// ==========================================
+const SubscriptionExpired = ({ userProfile, logout }) => (
+  <div className="frozen-container">
+    <div className="frozen-card animate-fadeIn">
+      <span className="frozen-icon">🔒</span>
+      <h1 className="frozen-title">Subscription Overdue</h1>
+      <p className="frozen-text">
+        Your account has been frozen due to an overdue subscription.
+      </p>
+      <div className="frozen-contact">
+        <strong>Account Details</strong>
+        <span>{userProfile?.name || 'N/A'}</span>
+        <span>KSh {userProfile?.subscription_fee?.toLocaleString() || '0'} Due</span>
+      </div>
+      <div className="frozen-buttons">
+        <button
+          onClick={() => window.location.href = 'tel:0711333436'}
+          className="btn btn-primary btn-full"
+        >
+          📞 Call Support to Renew
+        </button>
+        <button onClick={logout} className="btn btn-secondary btn-full">
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await login(email, password);
-    } catch (err) {
-      console.error('Login error:', err.message);
-      if (err.message?.includes('ACCOUNT_FROZEN_BY_ADMIN')) setError('FROZEN_TENANT');
-      else if (err.message?.includes('SUBSCRIPTION_FROZEN')) setError('FROZEN_ADMIN');
-      else setError(err.message || 'Failed to sign in');
-    } finally {
-      setLoading(false);
+// ==========================================
+// MAIN APP CONTENT
+// ==========================================
+function AppContent() {
+  const { userProfile, loading, logout, error } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  // Initialize theme from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('domusea-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      setIsDark(true);
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      setIsDark(false);
+      document.documentElement.setAttribute('data-theme', 'light');
     }
-  };
+  }, []);
 
-  const loginStyles = {
-    container: { 
-      display: 'flex', 
-      minHeight: '100vh', 
-      fontFamily: "'Inter', sans-serif",
-      background: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat fixed`,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
-    },
-    glassCard: {
-      display: 'flex',
-      maxWidth: '1000px',
-      width: '100%',
-      minHeight: '600px',
-      background: 'rgba(255, 255, 255, 0.95)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '30px',
-      overflow: 'hidden',
-      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-      border: '1px solid rgba(255, 255, 255, 0.3)'
-    },
-    leftPanel: { 
-      flex: 1, 
-      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', 
-      color: 'white',
-      padding: '60px',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      position: 'relative'
-    },
-    rightPanel: { 
-      flex: 1.2, 
-      padding: '60px',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      background: 'white'
-    },
-    quoteHeader: { fontSize: '12px', fontWeight: '600', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px', color: '#667eea' },
-    mainQuote: { fontSize: '40px', fontWeight: '800', lineHeight: '1.2', marginBottom: '20px' },
-    quoteText: { fontSize: '15px', lineHeight: '1.6', opacity: 0.8, marginBottom: '40px' },
-    branding: { marginTop: 'auto' },
-    logo: { fontSize: '24px', fontWeight: '800', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' },
-    welcomeTitle: { fontSize: '32px', fontWeight: '800', color: '#1e293b', marginBottom: '10px' },
-    welcomeSubtitle: { fontSize: '15px', color: '#64748b', marginBottom: '30px' },
-    form: { display: 'flex', flexDirection: 'column', gap: '20px' },
-    inputGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
-    label: { fontSize: '14px', fontWeight: '600', color: '#1e293b' },
-    inputWrapper: { position: 'relative' },
-    inputIcon: { position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 },
-    input: { 
-      width: '100%', 
-      padding: '14px 16px 14px 45px', 
-      border: '1px solid #e2e8f0', 
-      borderRadius: '12px', 
-      fontSize: '15px', 
-      background: '#f8fafc',
-      outline: 'none',
-      transition: 'all 0.2s'
-    },
-    signInButton: { 
-      width: '100%', 
-      padding: '16px', 
-      background: '#1e293b', 
-      color: 'white', 
-      border: 'none', 
-      borderRadius: '12px', 
-      fontSize: '16px', 
-      fontWeight: '700', 
-      cursor: 'pointer',
-      marginTop: '10px',
-      transition: 'all 0.2s'
-    },
-    loginFooter: {
-      marginTop: '30px',
-      paddingTop: '20px',
-      borderTop: '1px solid #f1f5f9',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      fontSize: '13px'
-    }
-  };
+  // Apply theme changes
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('domusea-theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
-  if (error === 'FROZEN_TENANT' || error === 'FROZEN_ADMIN') {
+  // Toggle theme
+  const toggleTheme = () => setIsDark(prev => !prev);
+
+  // Close mobile menu on resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Reset active tab when role changes
+  useEffect(() => {
+    setActiveTab('dashboard');
+  }, [userProfile?.role]);
+
+  // ==========================================
+  // LOADING STATE
+  // ==========================================
+  if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', padding: 20 }}>
-        <div style={{ background: 'white', borderRadius: 12, padding: 40, maxWidth: 450, width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>{error === 'FROZEN_TENANT' ? '⏳' : '🔒'}</div>
-          <h2 style={{ margin: '0 0 16px 0', color: error === 'FROZEN_TENANT' ? '#1f2937' : '#dc2626' }}>
-            {error === 'FROZEN_TENANT' ? 'Account Temporarily Unavailable' : 'Subscription Expired'}
-          </h2>
-          <p style={{ margin: '0 0 24px 0', color: '#6b7280' }}>
-            {error === 'FROZEN_TENANT' ? "Your property manager's account is currently inactive." : "Your account has been frozen due to an overdue subscription."}
-          </p>
-          <div style={{ padding: 16, background: error === 'FROZEN_TENANT' ? '#fef3c7' : '#fee2e2', borderRadius: 8, marginBottom: 24 }}>
-            <strong style={{ color: error === 'FROZEN_TENANT' ? '#92400e' : '#991b1b' }}>Contact to Renew:</strong><br/>
-            <span style={{ color: error === 'FROZEN_TENANT' ? '#92400e' : '#991b1b' }}>📞 0711 333 436<br/>📧 sa@domusea.com</span>
-          </div>
-          <button onClick={() => window.location.href = 'tel:0711333436'} style={{ ...loginStyles.signInButton, marginBottom: 12 }}>📞 Call Now</button>
-          <button onClick={() => { setError(''); setEmail(''); setPassword(''); }} style={{ ...loginStyles.signInButton, background: '#f3f4f6', color: '#374151' }}>Back to Login</button>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
+          <p className="text-muted text-lg font-medium">Loading DomusEA...</p>
+          <p className="text-muted text-sm mt-2">Secure Property Management Platform</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className={isDark ? 'dark' : ''} style={loginStyles.container}>
-      <div style={loginStyles.glassCard} className="login-card">
-        <div className="login-left" style={loginStyles.leftPanel}>
-          <div style={loginStyles.quoteHeader}>A WISE QUOTE</div>
-          <h1 style={loginStyles.mainQuote}>Build Better.<br/>Manage Smarter.</h1>
-          <p style={loginStyles.quoteText}>"The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."</p>
-          <div style={loginStyles.branding}>
-            <div style={loginStyles.logo}>🏠 DomusEA</div>
-            <div style={{fontSize: '14px', opacity: 0.7, marginTop: '5px'}}>Property Management Redefined</div>
-          </div>
-        </div>
+  // ==========================================
+  // NOT AUTHENTICATED
+  // ==========================================
+  if (!userProfile) {
+    return <LoginScreen isDark={isDark} toggleTheme={toggleTheme} error={error} />;
+  }
 
-        <div className="login-right" style={loginStyles.rightPanel}>
-          <div style={{width: '100%'}}>
-            <h2 style={loginStyles.welcomeTitle}>Welcome Back</h2>
-            <p style={loginStyles.welcomeSubtitle}>Enter your credentials to access your account</p>
+  // ==========================================
+  // SUBSCRIPTION EXPIRED (Admin Only)
+  // ==========================================
+  if (userProfile.role === 'admin' && userProfile.subscription_status === 'Overdue') {
+    return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
+  }
 
-            <form style={loginStyles.form} onSubmit={handleLogin}>
-              {error && (
-                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '14px' }}>⚠️ {error}</div>
-              )}
-              <div style={loginStyles.inputGroup}>
-                <label style={loginStyles.label}>Email Address</label>
-                <div style={loginStyles.inputWrapper}>
-                  <span style={loginStyles.inputIcon}>📧</span>
-                  <input type="email" placeholder="name@company.com" style={loginStyles.input} value={email} onChange={e => setEmail(e.target.value)} required />
-                </div>
-              </div>
-              <div style={loginStyles.inputGroup}>
-                <label style={loginStyles.label}>Password</label>
-                <div style={loginStyles.inputWrapper}>
-                  <span style={loginStyles.inputIcon}>🔒</span>
-                  <input type="password" placeholder="••••••••" style={loginStyles.input} value={password} onChange={e => setPassword(e.target.value)} required />
-                </div>
-              </div>
-              <button type="submit" disabled={loading} style={loginStyles.signInButton}>
-                {loading ? 'Signing In...' : 'Sign In'}
-              </button>
-            </form>
-
-            <div style={loginStyles.loginFooter}>
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <a href="tel:0711333436" style={{ color: '#1e293b', textDecoration: 'none' }}>📞 Call</a>
-                <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>💬 WhatsApp</a>
-              </div>
-              <div style={{ color: '#64748b', fontSize: '11px' }}>
-                Developed by <span style={{ color: '#667eea', fontWeight: '600' }}>Elizon Tech</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <style>{`
-        @media (max-width: 768px) { 
-          .login-card { 
-            flex-direction: column !important;
-            margin: 15px !important;
-            border-radius: 20px !important;
-            min-height: auto !important;
-          }
-          .login-left { 
-            padding: 40px 30px !important;
-            min-height: 200px !important;
-          }
-          .login-right { 
-            padding: 40px 30px !important;
-          }
-          .mainQuote { font-size: 28px !important; }
-          .welcomeTitle { font-size: 24px !important; }
-        }
-      `}</style>
-    </div>
-  );
-};
-
-// --- SUBSCRIPTION EXPIRED ---
-const SubscriptionExpired = ({ userProfile, logout }) => (
-  <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-200">
-      <div className="text-5xl mb-4">🔒</div>
-      <h1 className="text-2xl font-black text-slate-900 mb-2">Subscription Overdue</h1>
-      <p className="text-slate-500 mb-6 text-sm">Your account has been frozen. Please renew your subscription to regain access to your properties.</p>
-      <div className="bg-slate-50 rounded-xl p-4 text-left mb-6 border border-slate-100">
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Details</div>
-        <div className="text-sm font-bold text-slate-700">{userProfile?.name}</div>
-        <div className="text-xs text-slate-500">KSh {userProfile?.subscription_fee?.toLocaleString()} Due</div>
-      </div>
-      <button onClick={() => window.location.href = 'tel:0711333436'} className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl mb-3">📞 Call Support to Renew</button>
-      <button onClick={logout} className="w-full py-4 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-all">Logout</button>
-    </div>
-  </div>
-);
-
-// --- MAIN APP CONTENT ROUTER ---
-const AppContent = ({ userProfile, activeTab }) => {
-  const roles = {
-    supreme_admin: {
-      dashboard: <SADashboard />,
-      'property-moderation': <PropertyModeration />,
-      'property-map': <PropertyMap />,
-      'manage-admins': <ManageAdmins />,
-      'sa-subscriptions': <SASubscriptions />,
-      'sa-revenue': <SARevenueAnalytics />,
-      'sa-payments': <SAPayments />,
-      'sa-announcements': <SAAnnouncements />,
-      messages: <Messages />
-    },
-    admin: {
-      dashboard: <PropertyAdminDashboard />,
-      'add-property': <AddPropertyForm />,
-      'property-map': <PropertyMap adminId={userProfile?.id} />,
-      'manage-tenants': <ManageTenants />,
-      occupancy: <OccupancyGrid />,
-      'payment-methods': <AdminPaymentMethods />,
-      'admin-payments': <AdminPaymentsManager />,
-      'admin-revenue': <AdminRevenueAnalytics />,
-      complaints: <ComplaintsManager />,
-      messages: <Messages />
-    },
-    tenant: {
-      dashboard: <TenantDashboard />,
-      'pay-rent': <TenantPayRent />,
-      'payment-history': <TenantPaymentHistory />,
-      'tenant-requests': <TenantRequests />,
-      messages: <Messages />,
-      settings: <TenantSettings />
+  // ==========================================
+  // ROLE-BASED MENU CONFIGURATION
+  // ==========================================
+  const getMenuItems = () => {
+    const role = userProfile.role;
+    
+    // Supreme Admin
+    if (role === 'supreme_admin') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
+        { id: 'property-moderation', label: 'Moderation', icon: 'fas fa-shield-alt' },
+        { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
+        { id: 'manage-admins', label: 'Admins', icon: 'fas fa-users-cog' },
+        { id: 'sa-subscriptions', label: 'Subscriptions', icon: 'fas fa-credit-card' },
+        { id: 'sa-revenue', label: 'Revenue', icon: 'fas fa-chart-bar' },
+        { id: 'sa-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
+        { id: 'sa-announcements', label: 'Announcements', icon: 'fas fa-bullhorn' },
+        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
+      ];
     }
-  };
-  return roles[userProfile?.role]?.[activeTab] || roles[userProfile?.role]?.dashboard || <div>Not Found</div>;
-};
-
-// --- MAIN APP ---
-function App() {
-  const { userProfile, loading, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    return saved === 'dark';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    document.documentElement.className = isDark ? 'dark' : '';
-  }, [isDark]);
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-400">Loading DomusEA...</div>;
-  if (!userProfile) return <LoginScreen isDark={isDark} />;
-  if (userProfile.role === 'admin' && userProfile.subscription_status === 'Overdue') return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
-
-  const menuItems = {
-    supreme_admin: [
-      { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
-      { id: 'property-moderation', label: 'Moderation', icon: 'fas fa-shield-alt' },
-      { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
-      { id: 'manage-admins', label: 'Admins', icon: 'fas fa-users-cog' },
-      { id: 'sa-subscriptions', label: 'Subscriptions', icon: 'fas fa-credit-card' },
-      { id: 'sa-revenue', label: 'Revenue', icon: 'fas fa-chart-bar' },
-      { id: 'sa-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
-      { id: 'sa-announcements', label: 'Announcements', icon: 'fas fa-bullhorn' },
-      { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
-    ],
-    admin: [
-      { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
-      { id: 'add-property', label: 'Add Property', icon: 'fas fa-plus-circle' },
-      { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
-      { id: 'manage-tenants', label: 'Tenants', icon: 'fas fa-users' },
-      { id: 'occupancy', label: 'Occupancy', icon: 'fas fa-chart-line' },
-      { id: 'admin-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
-      { id: 'admin-revenue', label: 'Analytics', icon: 'fas fa-chart-bar' },
-      { id: 'complaints', label: 'Requests', icon: 'fas fa-inbox' },
-      { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
-    ],
-    tenant: [
-      { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
-      { id: 'pay-rent', label: 'Pay Rent', icon: 'fas fa-credit-card' },
-      { id: 'payment-history', label: 'History', icon: 'fas fa-history' },
-      { id: 'tenant-requests', label: 'Requests', icon: 'fas fa-inbox' },
-      { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
-    ]
+    
+    // Property Admin
+    if (role === 'admin') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
+        { id: 'add-property', label: 'Add Property', icon: 'fas fa-plus-circle' },
+        { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
+        { id: 'manage-tenants', label: 'Tenants', icon: 'fas fa-users' },
+        { id: 'occupancy', label: 'Occupancy', icon: 'fas fa-th-large' },
+        { id: 'admin-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
+        { id: 'admin-revenue', label: 'Analytics', icon: 'fas fa-chart-bar' },
+        { id: 'complaints', label: 'Requests', icon: 'fas fa-inbox' },
+        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
+      ];
+    }
+    
+    // Tenant
+    if (role === 'tenant') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
+        { id: 'pay-rent', label: 'Pay Rent', icon: 'fas fa-credit-card' },
+        { id: 'payment-history', label: 'History', icon: 'fas fa-history' },
+        { id: 'tenant-requests', label: 'Requests', icon: 'fas fa-inbox' },
+        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' },
+        { id: 'settings', label: 'Settings', icon: 'fas fa-cog' }
+      ];
+    }
+    
+    return [];
   };
 
-  const currentMenu = menuItems[userProfile?.role] || [];
+  // ==========================================
+  // ROLE-BASED COMPONENT RENDERING (STRICT)
+  // ==========================================
+  const renderContent = () => {
+    const role = userProfile.role;
+    
+    console.log('🎯 [APP] Rendering for role:', role, '| Tab:', activeTab);
+    
+    // ==========================================
+    // SUPREME ADMIN ROUTING (EXCLUSIVE)
+    // ==========================================
+    if (role === 'supreme_admin') {
+      console.log('✅ Routing to Supreme Admin Dashboard');
+      switch (activeTab) {
+        case 'dashboard': return <SADashboard />;
+        case 'property-moderation': return <PropertyModeration />;
+        case 'property-map': return <PropertyMap />;
+        case 'manage-admins': return <ManageAdmins />;
+        case 'sa-subscriptions': return <SASubscriptions />;
+        case 'sa-revenue': return <SARevenueAnalytics />;
+        case 'sa-payments': return <SAPayments />;
+        case 'sa-announcements': return <SAAnnouncements />;
+        case 'messages': return <Messages />;
+        default: return <SADashboard />;
+      }
+    }
+    
+    // ==========================================
+    // PROPERTY ADMIN ROUTING (EXCLUSIVE)
+    // ==========================================
+    if (role === 'admin') {
+      console.log('✅ Routing to Property Admin Dashboard');
+      switch (activeTab) {
+        case 'dashboard': return <PropertyAdminDashboard />;
+        case 'add-property': return <AddPropertyForm />;
+        case 'property-map': return <PropertyMap adminId={userProfile.id} />;
+        case 'manage-tenants': return <ManageTenants />;
+        case 'occupancy': return <OccupancyGrid />;
+        case 'admin-payments': return <AdminPaymentsManager />;
+        case 'admin-revenue': return <AdminRevenueAnalytics />;
+        case 'complaints': return <ComplaintsManager />;
+        case 'messages': return <Messages />;
+        default: return <PropertyAdminDashboard />;
+      }
+    }
+    
+    // ==========================================
+    // TENANT ROUTING (EXCLUSIVE)
+    // ==========================================
+    if (role === 'tenant') {
+      console.log('✅ Routing to Tenant Dashboard');
+      switch (activeTab) {
+        case 'dashboard': return <TenantDashboard />;
+        case 'pay-rent': return <TenantPayRent />;
+        case 'payment-history': return <TenantPaymentHistory />;
+        case 'tenant-requests': return <TenantRequests />;
+        case 'messages': return <Messages />;
+        case 'settings': return <TenantSettings />;
+        default: return <TenantDashboard />;
+      }
+    }
+    
+    // ==========================================
+    // FALLBACK - UNKNOWN ROLE
+    // ==========================================
+    console.error('❌ [APP] Unknown role:', role);
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="card p-8 text-center max-w-md">
+          <div className="text-5xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-danger mb-2">Unknown Role</h2>
+          <p className="text-muted mb-6">
+            Your role <code className="px-2 py-1 bg-faint rounded text-sm">"{role}"</code> is not recognized.
+            Please contact support to resolve this issue.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={logout} className="btn btn-primary flex-1">
+              <i className="fas fa-sign-out-alt"></i> Logout
+            </button>
+            <button
+              onClick={() => window.location.href = 'tel:0711333436'}
+              className="btn btn-secondary flex-1"
+            >
+              <i className="fas fa-phone"></i> Call Support
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // RENDER APP
+  // ==========================================
+  const menuItems = getMenuItems();
+  const userRole = userProfile.role?.replace('_', ' ') || 'Unknown';
 
   return (
-    <div className={`mockup-body ${isDark ? 'dark' : ''}`}>
-      {/* Navigation */}
-      <nav className="mockup-navbar">
-        <div className="mockup-nav-container">
-          <a href="#" className="mockup-brand" onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>
+    <div className={`app-wrapper ${isDark ? 'dark' : ''}`}>
+      {/* Skip to content for accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-white px-4 py-2 rounded-lg z-50"
+      >
+        Skip to main content
+      </a>
+
+      {/* ========================================== */}
+      {/* NAVIGATION BAR                               */}
+      {/* ========================================== */}
+      <nav className="navbar" role="navigation" aria-label="Main navigation">
+        <div className="nav-container">
+          {/* Brand */}
+          <a
+            href="#"
+            className="brand"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('dashboard');
+            }}
+            aria-label="DomusEA Home"
+          >
             <i className="fas fa-building"></i>
-            DomusEA
+            <span>DomusEA</span>
           </a>
-          
-          <ul className={`mockup-nav-menu ${isMobileMenuOpen ? 'active' : ''}`} id="navMenu">
-            {currentMenu.map(item => (
-              <li key={item.id}>
-                <a 
-                  href="#" 
-                  className={activeTab === item.id ? 'active' : ''} 
-                  onClick={(e) => { e.preventDefault(); setActiveTab(item.id); setIsMobileMenuOpen(false); }}
+
+          {/* Navigation Menu */}
+          <ul
+            className={`nav-menu ${isMobileMenuOpen ? 'active' : ''}`}
+            id="navMenu"
+            role="menubar"
+          >
+            {menuItems.map((item) => (
+              <li key={item.id} role="none">
+                <a
+                  href="#"
+                  className={activeTab === item.id ? 'active' : ''}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveTab(item.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  role="menuitem"
+                  aria-current={activeTab === item.id ? 'page' : undefined}
                 >
-                  <i className={item.icon}></i> {item.label}
+                  <i className={item.icon} aria-hidden="true"></i>
+                  <span>{item.label}</span>
                 </a>
               </li>
             ))}
           </ul>
 
-          <div className="mockup-nav-actions">
-            <div className="mockup-user-info">
-              <div className="mockup-user-avatar">{userProfile?.name?.charAt(0)}{userProfile?.name?.split(' ')[1]?.charAt(0)}</div>
-              <div className="hide-mobile">
-                <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{userProfile?.name}</div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{userProfile?.role?.replace('_', ' ')}</div>
+          {/* Right Actions */}
+          <div className="nav-actions">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="theme-toggle"
+              aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+              title="Toggle theme"
+            >
+              <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
+              <span className="hide-mobile">{isDark ? 'Light' : 'Dark'}</span>
+            </button>
+
+            {/* User Info */}
+            <div
+              className="user-info"
+              title={`${userProfile?.name} • ${userRole}`}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="user-avatar" aria-hidden="true">
+                {userProfile?.name?.charAt(0).toUpperCase()}
+                {userProfile?.name?.split(' ')?.[1]?.charAt(0).toUpperCase() || ''}
+              </div>
+              <div className="user-details hide-mobile">
+                <div className="user-name">{userProfile?.name}</div>
+                <div className="user-role">{userRole}</div>
               </div>
             </div>
-            <button onClick={() => setIsDark(!isDark)} className="mockup-btn" style={{padding: '0.5rem', background: 'transparent', color: '#64748b'}} title="Toggle Theme">
-              <i className={`fas ${isDark ? 'fa-sun' : 'fa-moon'}`}></i>
-            </button>
-            <button onClick={logout} className="mockup-btn" style={{padding: '0.5rem', background: 'transparent', color: '#ef4444'}} title="Logout">
+
+            {/* Logout */}
+            <button
+              onClick={logout}
+              className="btn btn-danger btn-sm"
+              title="Logout"
+              aria-label="Logout from your account"
+            >
               <i className="fas fa-sign-out-alt"></i>
+              <span className="hide-mobile">Logout</span>
             </button>
-            <div className="mockup-hamburger" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+
+            {/* Mobile Menu Toggle */}
+            <button
+              className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="navMenu"
+            >
               <span></span>
               <span></span>
               <span></span>
-            </div>
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main style={{minHeight: 'calc(100vh - 160px)'}}>
-        <AppContent userProfile={userProfile} activeTab={activeTab} />
+      {/* ========================================== */}
+      {/* MAIN CONTENT                                 */}
+      {/* ========================================== */}
+      <main id="main-content" className="main-content" role="main">
+        {renderContent()}
       </main>
 
-      {/* Footer */}
-      <footer className="mockup-footer">
-        <div className="mockup-footer-content">
-          <div className="mockup-footer-links">
-            <a href="tel:0711333436"><i className="fas fa-phone"></i> 0711 333 436</a>
-            <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer"><i className="fab fa-whatsapp"></i> WhatsApp</a>
-            <a href="#"><i className="fas fa-shield-alt"></i> Restricted Access</a>
+      {/* ========================================== */}
+      {/* FOOTER                                       */}
+      {/* ========================================== */}
+      <footer className="footer" role="contentinfo">
+        <div className="footer-content">
+          <div className="footer-links">
+            <a href="tel:0711333436">
+              <i className="fas fa-phone"></i>
+              <span>0711 333 436</span>
+            </a>
+            <a
+              href="https://wa.me/254711333436"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <i className="fab fa-whatsapp"></i>
+              <span>WhatsApp</span>
+            </a>
+            <a href="#">
+              <i className="fas fa-shield-alt"></i>
+              <span>Restricted Access</span>
+            </a>
           </div>
-          <p>&copy; {new Date().getFullYear()} DomusEA | Developed by <a href="#" style={{ color: '#4f46e5', textDecoration: 'none', fontWeight: 600 }}>Elizon Tech</a></p>
+          <p className="footer-copyright">
+            © {new Date().getFullYear()} DomusEA. All rights reserved. |
+            Developed by{' '}
+            <a
+              href="https://elizontech.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Elizon Tech
+            </a>
+          </p>
         </div>
       </footer>
 
-      <style>{`
-        .hide-mobile { display: block; }
-        @media (max-width: 768px) {
-          .hide-mobile { display: none; }
-        }
-      `}</style>
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="mobile-overlay"
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 }
 
-export default function Root() {
+// ==========================================
+// ROOT EXPORT WITH AUTH PROVIDER
+// ==========================================
+export default function App() {
   return (
     <AuthProvider>
-      <App />
+      <AppContent />
     </AuthProvider>
   );
 }
