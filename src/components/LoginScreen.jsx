@@ -25,7 +25,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
   };
 
   return (
-    <div className="login-screen-container">
+    <div className={`login-screen-container ${isDark ? 'dark' : ''}`}>
       {/* Theme Toggle */}
       {toggleTheme && (
         <button 
@@ -38,7 +38,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         </button>
       )}
 
-      {/* Left Side - Quote Section with Background Image */}
+      {/* Left Side - Quote Section */}
       <div className="left-panel">
         <div className="overlay">
           <div className="quote-container">
@@ -57,23 +57,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
       {/* Right Side - Login Form */}
       <div className="right-panel">
-        {/* Top Bar */}
-        <div className="top-bar">
-          <div className="contact-info">
-            <span className="contact-item">
-              <span className="phone-icon">📞</span>
-              0711 333 436
-            </span>
-            <span className="contact-item">
-              <span className="whatsapp-icon">💬</span>
-              <span className="whatsapp-text">WhatsApp</span>
-            </span>
-          </div>
-          <div className="developer-info">
-            © 2026 DomusEA | Developed by <span className="developer">Elizon Tech</span>
-          </div>
-        </div>
-
         {/* Login Container */}
         <div className="login-container">
           {/* Header */}
@@ -161,13 +144,25 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               )}
             </button>
           </form>
-        </div>
 
-        {/* Footer */}
-        <div className="footer">
-          <div className="security-badge">
-            <span className="lock-icon">🔐</span>
-            <span>Restricted Access • Authorized Personnel Only</span>
+          {/* Slim Professional Footer */}
+          <div className="login-footer">
+            <div className="footer-content">
+              <div className="footer-contact">
+                <a href="tel:0711333436" className="contact-link">
+                  <i className="fas fa-phone"></i>
+                  <span>0711 333 436</span>
+                </a>
+                <span className="footer-divider">•</span>
+                <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" className="contact-link whatsapp">
+                  <i className="fab fa-whatsapp"></i>
+                  <span>WhatsApp</span>
+                </a>
+              </div>
+              <p className="copyright">
+                © 2026 DomusEA • Developed by <span className="developer">Elizon Tech</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -178,16 +173,67 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           min-height: 100vh;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           position: relative;
+          transition: background-color 0.3s ease;
+        }
+        
+        /* ===== LIGHT MODE (Default) ===== */
+        .login-screen-container {
+          --bg-right: #ffffff;
+          --text-primary: #111827;
+          --text-secondary: #374151;
+          --text-muted: #6b7280;
+          --text-inverse: #ffffff;
+          --border-color: #e5e7eb;
+          --border-light: #f3f4f6;
+          --input-bg: #f9fafb;
+          --input-border: #d1d5db;
+          --error-bg: #fee2e2;
+          --error-border: #fecaca;
+          --error-text: #b91c1c;
+          --footer-border: #e5e7eb;
+          --footer-text: #9ca3af;
+          --contact-text: #4b5563;
+          --whatsapp-color: #059669;
+          --theme-btn-bg: rgba(255, 255, 255, 0.95);
+          --theme-btn-text: #1f2937;
+          --theme-btn-border: #e5e7eb;
+          --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+          --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* ===== DARK MODE ===== */
+        .login-screen-container.dark {
+          --bg-right: #1e293b;
+          --text-primary: #f1f5f9;
+          --text-secondary: #cbd5e1;
+          --text-muted: #94a3b8;
+          --text-inverse: #0f172a;
+          --border-color: #334155;
+          --border-light: #475569;
+          --input-bg: #334155;
+          --input-border: #475569;
+          --error-bg: rgba(239, 68, 68, 0.15);
+          --error-border: rgba(239, 68, 68, 0.3);
+          --error-text: #fca5a5;
+          --footer-border: #334155;
+          --footer-text: #64748b;
+          --contact-text: #94a3b8;
+          --whatsapp-color: #34d399;
+          --theme-btn-bg: rgba(30, 41, 59, 0.95);
+          --theme-btn-text: #e2e8f0;
+          --theme-btn-border: #475569;
+          --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+          --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
         }
         
         .theme-toggle-btn {
           position: absolute;
           top: 20px;
           right: 20px;
-          z-index: 100;
+          z-index: 1000;
           padding: 10px 20px;
-          background: rgba(255, 255, 255, 0.9);
-          border: 1px solid #e5e7eb;
+          background: var(--theme-btn-bg);
+          border: 1px solid var(--theme-btn-border);
           border-radius: 8px;
           cursor: pointer;
           display: flex;
@@ -195,35 +241,49 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           gap: 8px;
           font-size: 14px;
           font-weight: 500;
-          color: #374151;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          color: var(--theme-btn-text);
+          box-shadow: var(--shadow-sm);
           transition: all 0.2s;
         }
         
         .theme-toggle-btn:hover {
-          background: rgba(255, 255, 255, 1);
           transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+          box-shadow: var(--shadow);
         }
         
         .left-panel {
           flex: 1;
-          background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80');
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          background-attachment: fixed;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           position: relative;
           display: flex;
           align-items: center;
-          padding: 60px;
+          justify-content: center;
+          padding: 60px 40px;
           animation: slideIn 0.8s ease-out;
+          transition: opacity 0.3s ease;
+        }
+        
+        .login-screen-container.dark .left-panel {
+          background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        }
+        
+        .left-panel::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                      radial-gradient(circle at 70% 80%, rgba(255,255,255,0.05) 0%, transparent 50%);
+          pointer-events: none;
         }
         
         .overlay {
           position: relative;
           z-index: 2;
           max-width: 500px;
+          text-align: center;
         }
         
         .quote-container {
@@ -236,21 +296,22 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           letter-spacing: 2px;
           text-transform: uppercase;
           margin-bottom: 20px;
-          opacity: 0.9;
+          opacity: 0.95;
         }
         
         .main-quote {
-          font-size: 48px;
+          font-size: 42px;
           font-weight: 700;
           line-height: 1.2;
-          margin-bottom: 30px;
+          margin-bottom: 24px;
           letter-spacing: -1px;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         
         .quote-text {
           font-size: 16px;
-          line-height: 1.8;
-          opacity: 0.9;
+          line-height: 1.6;
+          opacity: 0.95;
           margin-bottom: 40px;
           font-style: italic;
         }
@@ -260,70 +321,24 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         }
         
         .logo {
-          font-size: 24px;
+          font-size: 28px;
           font-weight: 700;
           margin-bottom: 8px;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         
         .tagline {
           font-size: 14px;
-          opacity: 0.8;
+          opacity: 0.9;
         }
         
         .right-panel {
           flex: 1;
           display: flex;
           flex-direction: column;
-          background: #ffffff;
+          background: var(--bg-right);
           position: relative;
-        }
-        
-        .top-bar {
-          padding: 20px 40px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 1px solid #e5e7eb;
-          background: #f9fafb;
-          flex-shrink: 0;
-        }
-        
-        .contact-info {
-          display: flex;
-          gap: 24px;
-          align-items: center;
-        }
-        
-        .contact-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          color: #374151;
-          font-weight: 500;
-        }
-        
-        .phone-icon {
-          font-size: 16px;
-        }
-        
-        .whatsapp-icon {
-          font-size: 16px;
-        }
-        
-        .whatsapp-text {
-          color: #10b981;
-          font-weight: 600;
-        }
-        
-        .developer-info {
-          font-size: 13px;
-          color: #6b7280;
-        }
-        
-        .developer {
-          color: #667eea;
-          font-weight: 600;
+          transition: background-color 0.3s ease;
         }
         
         .login-container {
@@ -332,47 +347,52 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           flex-direction: column;
           justify-content: center;
           padding: 60px 40px;
-          max-width: 450px;
+          max-width: 480px;
           margin: 0 auto;
           width: 100%;
         }
         
         .header {
           margin-bottom: 40px;
+          text-align: center;
         }
         
         .logo-small {
-          font-size: 20px;
-          font-weight: 700;
-          color: #667eea;
-          margin-bottom: 20px;
+          font-size: 32px;
+          margin-bottom: 16px;
+          color: var(--text-primary);
+          transition: color 0.3s ease;
         }
         
         .welcome-title {
           font-size: 32px;
           font-weight: 700;
-          color: #111827;
-          margin-bottom: 8px;
+          color: var(--text-primary);
+          margin: 0 0 8px 0;
           letter-spacing: -0.5px;
+          transition: color 0.3s ease;
         }
         
         .welcome-subtitle {
           font-size: 15px;
-          color: #6b7280;
+          color: var(--text-secondary);
+          margin: 0;
           line-height: 1.5;
+          transition: color 0.3s ease;
         }
         
         .error-message {
           padding: 12px 16px;
-          background: #fee2e2;
-          border: 1px solid #fecaca;
+          background: var(--error-bg);
+          border: 1px solid var(--error-border);
           border-radius: 8px;
-          color: #b91c1c;
+          color: var(--error-text);
           font-size: 14px;
           margin-bottom: 24px;
           display: flex;
           align-items: center;
           gap: 8px;
+          transition: all 0.3s ease;
         }
         
         .error-icon {
@@ -382,20 +402,21 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         .form {
           display: flex;
           flex-direction: column;
-          gap: 24px;
+          gap: 20px;
         }
         
         .input-group {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
         }
         
         .label {
           font-size: 14px;
           font-weight: 600;
-          color: #374151;
+          color: var(--text-primary);
           letter-spacing: 0.3px;
+          transition: color 0.3s ease;
         }
         
         .input-wrapper {
@@ -409,25 +430,33 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           left: 16px;
           font-size: 18px;
           z-index: 1;
-          opacity: 0.5;
+          opacity: 0.6;
+          color: var(--text-secondary);
+          transition: color 0.3s ease;
         }
         
         .input {
           width: 100%;
           padding: 14px 16px 14px 48px;
-          border: 2px solid #e5e7eb;
+          border: 2px solid var(--input-border);
           border-radius: 12px;
           font-size: 15px;
           transition: all 0.2s;
           outline: none;
-          background: #f9fafb;
+          background: var(--input-bg);
           font-family: inherit;
           box-sizing: border-box;
+          color: var(--text-primary);
+        }
+        
+        .input::placeholder {
+          color: var(--text-muted);
+          opacity: 0.8;
         }
         
         .input:focus {
           border-color: #667eea;
-          background: #ffffff;
+          background: var(--bg-right);
           box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
         }
         
@@ -438,8 +467,13 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           border: none;
           cursor: pointer;
           padding: 4px;
-          color: #6b7280;
+          color: var(--text-secondary);
           font-size: 16px;
+          transition: color 0.2s;
+        }
+        
+        .password-toggle:hover {
+          color: #667eea;
         }
         
         .remember-row {
@@ -447,14 +481,16 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           justify-content: space-between;
           align-items: center;
           font-size: 14px;
+          margin-top: 8px;
         }
         
         .checkbox-label {
           display: flex;
           align-items: center;
           gap: 8px;
-          color: #6b7280;
+          color: var(--text-secondary);
           cursor: pointer;
+          transition: color 0.3s ease;
         }
         
         .checkbox {
@@ -487,14 +523,15 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.2);
+          box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3);
           transition: all 0.2s;
           cursor: pointer;
+          margin-top: 8px;
         }
         
         .sign-in-button:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+          box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
         }
         
         .sign-in-button:active:not(:disabled) {
@@ -515,30 +552,70 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           transform: translateX(4px);
         }
         
-        .footer {
-          padding: 24px 40px;
-          border-top: 1px solid #e5e7eb;
-          background: #f9fafb;
-          flex-shrink: 0;
+        /* Slim Professional Footer */
+        .login-footer {
+          margin-top: 48px;
+          padding-top: 24px;
+          border-top: 1px solid var(--footer-border);
+          transition: border-color 0.3s ease;
         }
         
-        .security-badge {
+        .footer-content {
+          text-align: center;
+        }
+        
+        .footer-contact {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 12px;
+        }
+        
+        .contact-link {
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 8px;
+          gap: 6px;
           font-size: 13px;
-          color: #9ca3af;
+          color: var(--contact-text);
+          text-decoration: none;
           font-weight: 500;
+          transition: all 0.2s;
         }
         
-        .lock-icon {
-          font-size: 16px;
+        .contact-link:hover {
+          color: #667eea;
+          transform: translateY(-1px);
         }
         
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
+        .contact-link.whatsapp {
+          color: var(--whatsapp-color);
+        }
+        
+        .contact-link.whatsapp:hover {
+          color: #047857;
+        }
+        
+        .contact-link i {
+          font-size: 14px;
+        }
+        
+        .footer-divider {
+          color: var(--border-light);
+          font-size: 12px;
+        }
+        
+        .copyright {
+          font-size: 12px;
+          color: var(--footer-text);
+          margin: 0;
+          line-height: 1.4;
+          transition: color 0.3s ease;
+        }
+        
+        .developer {
+          color: #667eea;
+          font-weight: 600;
         }
         
         @keyframes slideIn {
@@ -546,10 +623,19 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           to { transform: translateX(0); }
         }
         
-        @media (max-width: 768px) {
+        @media (max-width: 968px) {
           .left-panel {
-            padding: 40px 30px;
-            min-height: 250px;
+            display: none;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .login-container {
+            padding: 40px 24px;
+          }
+          
+          .welcome-title {
+            font-size: 28px;
           }
           
           .main-quote {
@@ -557,6 +643,15 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           }
           
           .theme-toggle-btn span {
+            display: none;
+          }
+          
+          .footer-contact {
+            flex-direction: column;
+            gap: 8px;
+          }
+          
+          .footer-divider {
             display: none;
           }
         }
