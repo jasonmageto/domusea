@@ -1,13 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 
 export default function LoginScreen({ isDark, toggleTheme }) {
-  const { login, authError } = useAuth();
+  const { login, error: authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+  // Listen for PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('✅ User accepted the install prompt');
+      setShowInstallPrompt(false);
+      setDeferredPrompt(null);
+    } else {
+      console.log('❌ User dismissed the install prompt');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,6 +67,18 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         >
           <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
           <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
+      )}
+
+      {/* Download App Button - Top Right */}
+      {showInstallPrompt && (
+        <button 
+          onClick={handleInstallApp}
+          className="install-app-btn"
+          aria-label="Install DomusEA App"
+        >
+          <i className="fas fa-download"></i>
+          <span>Download App</span>
         </button>
       )}
 
@@ -71,6 +115,22 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             <div className="error-message">
               <span className="error-icon">⚠️</span>
               <span>{error || authError}</span>
+            </div>
+          )}
+
+          {/* Download App Banner */}
+          {showInstallPrompt && (
+            <div className="download-banner">
+              <div className="banner-content">
+                <i className="fas fa-mobile-alt"></i>
+                <div className="banner-text">
+                  <strong>Get the DomusEA App</strong>
+                  <span>Install for a better experience</span>
+                </div>
+                <button onClick={handleInstallApp} className="btn btn-primary btn-sm">
+                  <i className="fas fa-download"></i> Install
+                </button>
+              </div>
             </div>
           )}
 
@@ -176,7 +236,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           transition: background-color 0.3s ease;
         }
         
-        /* ===== LIGHT MODE (Default) ===== */
+        /* ===== THEME VARIABLES ===== */
         .login-screen-container {
           --bg-right: #ffffff;
           --text-primary: #111827;
@@ -201,7 +261,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
-        /* ===== DARK MODE ===== */
         .login-screen-container.dark {
           --bg-right: #1e293b;
           --text-primary: #f1f5f9;
@@ -226,6 +285,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
         }
         
+        /* Theme Toggle Button */
         .theme-toggle-btn {
           position: absolute;
           top: 20px;
@@ -251,6 +311,81 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           box-shadow: var(--shadow);
         }
         
+        /* Install App Button - Top Right */
+        .install-app-btn {
+          position: absolute;
+          top: 20px;
+          right: 250px;
+          z-index: 1000;
+          padding: 10px 20px;
+          background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          color: white;
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+          transition: all 0.2s;
+          animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .install-app-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+        }
+        
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+          50% { box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5); }
+        }
+        
+        /* Download Banner */
+        .download-banner {
+          background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(67, 56, 202, 0.1) 100%);
+          border: 2px solid #4F46E5;
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 24px;
+          animation: slideDown 0.4s ease-out;
+        }
+        
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .banner-content {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        
+        .banner-content i {
+          font-size: 32px;
+          color: #4F46E5;
+        }
+        
+        .banner-text {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .banner-text strong {
+          color: var(--text-primary);
+          font-size: 15px;
+        }
+        
+        .banner-text span {
+          color: var(--text-muted);
+          font-size: 13px;
+        }
+        
+        /* Left Panel */
         .left-panel {
           flex: 1;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -332,6 +467,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           opacity: 0.9;
         }
         
+        /* Right Panel */
         .right-panel {
           flex: 1;
           display: flex;
@@ -624,12 +760,29 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         }
         
         @media (max-width: 968px) {
+          .install-app-btn {
+            right: 150px;
+            padding: 8px 16px;
+            font-size: 13px;
+          }
+          
           .left-panel {
             display: none;
           }
         }
         
         @media (max-width: 480px) {
+          .install-app-btn {
+            right: 20px;
+            top: 70px;
+            padding: 8px 12px;
+            font-size: 12px;
+          }
+          
+          .install-app-btn span {
+            display: none;
+          }
+          
           .login-container {
             padding: 40px 24px;
           }
@@ -653,6 +806,11 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           
           .footer-divider {
             display: none;
+          }
+          
+          .banner-content {
+            flex-direction: column;
+            text-align: center;
           }
         }
       `}</style>

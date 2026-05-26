@@ -1,11 +1,34 @@
 {
   "name": "DomusEA - Estate Management System",
   "short_name": "DomusEA",
-  "description": "Build Better. Manage Smarter.",
+  "description": "Build Better. Manage Smarter. - Secure Property Management Platform",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#F8FAFC",
+  "theme_color": "#4F46E5",
   "orientation": "portrait-primary",
-  "icons": []
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity", "finance"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Go to dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon-512.png", "sizes": "192x192" }]
+    }
+  ]
 }
