@@ -452,7 +452,7 @@ function AppContent() {
         </div>
       </footer>
 
-      {/* Mobile Overlay - Click to close menu */}
+      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
           className="mobile-overlay"
