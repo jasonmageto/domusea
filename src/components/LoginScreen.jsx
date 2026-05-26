@@ -9,17 +9,21 @@ export default function LoginScreen({ isDark, toggleTheme }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
 
   // Listen for PWA install prompt
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setShowInstallPrompt(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Check if app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsAppInstalled(true);
+    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -34,7 +38,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
     
     if (outcome === 'accepted') {
       console.log('✅ User accepted the install prompt');
-      setShowInstallPrompt(false);
+      setIsAppInstalled(true);
       setDeferredPrompt(null);
     } else {
       console.log('❌ User dismissed the install prompt');
@@ -58,7 +62,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
   return (
     <div className={`login-screen-container ${isDark ? 'dark' : ''}`}>
-      {/* Theme Toggle */}
+      {/* Theme Toggle - Top Right */}
       {toggleTheme && (
         <button 
           onClick={toggleTheme}
@@ -67,18 +71,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         >
           <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
           <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
-        </button>
-      )}
-
-      {/* Download App Button - Top Right */}
-      {showInstallPrompt && (
-        <button 
-          onClick={handleInstallApp}
-          className="install-app-btn"
-          aria-label="Install DomusEA App"
-        >
-          <i className="fas fa-download"></i>
-          <span>Download App</span>
         </button>
       )}
 
@@ -91,6 +83,20 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             <p className="quote-text">
               "The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."
             </p>
+            
+            {/* ✅ DOWNLOAD APP BUTTON - Left Panel */}
+            {!isAppInstalled && (
+              <button 
+                onClick={handleInstallApp}
+                className="download-app-btn"
+                aria-label="Download DomusEA App"
+              >
+                <i className="fas fa-mobile-alt"></i>
+                <span>Download App</span>
+                <i className="fas fa-arrow-right"></i>
+              </button>
+            )}
+            
             <div className="branding">
               <div className="logo">🏠 DomusEA</div>
               <div className="tagline">Property Management Redefined</div>
@@ -115,22 +121,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             <div className="error-message">
               <span className="error-icon">⚠️</span>
               <span>{error || authError}</span>
-            </div>
-          )}
-
-          {/* Download App Banner */}
-          {showInstallPrompt && (
-            <div className="download-banner">
-              <div className="banner-content">
-                <i className="fas fa-mobile-alt"></i>
-                <div className="banner-text">
-                  <strong>Get the DomusEA App</strong>
-                  <span>Install for a better experience</span>
-                </div>
-                <button onClick={handleInstallApp} className="btn btn-primary btn-sm">
-                  <i className="fas fa-download"></i> Install
-                </button>
-              </div>
             </div>
           )}
 
@@ -311,78 +301,59 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           box-shadow: var(--shadow);
         }
         
-        /* Install App Button - Top Right */
-        .install-app-btn {
-          position: absolute;
-          top: 20px;
-          right: 250px;
-          z-index: 1000;
-          padding: 10px 20px;
-          background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          display: flex;
+        /* ✅ DOWNLOAD APP BUTTON - Left Panel */
+        .download-app-btn {
+          display: inline-flex;
           align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          font-weight: 600;
+          justify-content: center;
+          gap: 12px;
+          padding: 14px 28px;
+          background: rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-radius: 50px;
           color: white;
-          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
-          transition: all 0.2s;
-          animation: pulse 2s ease-in-out infinite;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          margin: 20px 0;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+          animation: pulse-download 2s ease-in-out infinite;
         }
         
-        .install-app-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+        .download-app-btn:hover {
+          background: rgba(255, 255, 255, 0.25);
+          border-color: rgba(255, 255, 255, 0.5);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         }
         
-        @keyframes pulse {
-          0%, 100% { box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
-          50% { box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5); }
+        .download-app-btn:active {
+          transform: translateY(-1px);
         }
         
-        /* Download Banner */
-        .download-banner {
-          background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(67, 56, 202, 0.1) 100%);
-          border: 2px solid #4F46E5;
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 24px;
-          animation: slideDown 0.4s ease-out;
+        .download-app-btn i:first-child {
+          font-size: 20px;
         }
         
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
+        .download-app-btn i:last-child {
+          font-size: 14px;
+          transition: transform 0.3s ease;
         }
         
-        .banner-content {
-          display: flex;
-          align-items: center;
-          gap: 16px;
+        .download-app-btn:hover i:last-child {
+          transform: translateX(4px);
         }
         
-        .banner-content i {
-          font-size: 32px;
-          color: #4F46E5;
-        }
-        
-        .banner-text {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .banner-text strong {
-          color: var(--text-primary);
-          font-size: 15px;
-        }
-        
-        .banner-text span {
-          color: var(--text-muted);
-          font-size: 13px;
+        @keyframes pulse-download {
+          0%, 100% { 
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+          }
+          50% { 
+            box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
+          }
         }
         
         /* Left Panel */
@@ -419,10 +390,16 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           z-index: 2;
           max-width: 500px;
           text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         
         .quote-container {
           color: white;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         
         .quote-header {
@@ -447,12 +424,13 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           font-size: 16px;
           line-height: 1.6;
           opacity: 0.95;
-          margin-bottom: 40px;
+          margin-bottom: 10px;
           font-style: italic;
         }
         
         .branding {
-          margin-top: 40px;
+          margin-top: auto;
+          padding-top: 20px;
         }
         
         .logo {
@@ -760,29 +738,12 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         }
         
         @media (max-width: 968px) {
-          .install-app-btn {
-            right: 150px;
-            padding: 8px 16px;
-            font-size: 13px;
-          }
-          
           .left-panel {
             display: none;
           }
         }
         
         @media (max-width: 480px) {
-          .install-app-btn {
-            right: 20px;
-            top: 70px;
-            padding: 8px 12px;
-            font-size: 12px;
-          }
-          
-          .install-app-btn span {
-            display: none;
-          }
-          
           .login-container {
             padding: 40px 24px;
           }
@@ -808,9 +769,10 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             display: none;
           }
           
-          .banner-content {
-            flex-direction: column;
-            text-align: center;
+          .download-app-btn {
+            padding: 12px 24px;
+            font-size: 14px;
+            gap: 8px;
           }
         }
       `}</style>
