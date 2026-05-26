@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 
 export default function LoginScreen({ isDark, toggleTheme }) {
-  // ✅ FIX: Destructure 'error' as 'authError' to match AuthContext
+  // ✅ Fix: Destructure 'error' as 'authError'
   const { login, error: authError } = useAuth();
   
   const [email, setEmail] = useState('');
@@ -78,7 +78,19 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         </button>
       )}
 
-      {/* Left Side - Quote Section (Desktop Only) */}
+      {/* Download App Button - Top Left (Desktop) */}
+      {!isAppInstalled && deferredPrompt && (
+        <button 
+          onClick={handleInstallApp}
+          className="download-app-btn"
+          aria-label="Download DomusEA App"
+        >
+          <i className="fas fa-download"></i>
+          <span>Download App</span>
+        </button>
+      )}
+
+      {/* Left Side - Quote Section */}
       <div className="left-panel">
         <div className="overlay">
           <div className="quote-container">
@@ -88,19 +100,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               "The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."
             </p>
             
-            {/* ✅ DESKTOP DOWNLOAD BUTTON (Hidden on Mobile) */}
-            {!isAppInstalled && deferredPrompt && (
-              <button 
-                onClick={handleInstallApp}
-                className="download-app-btn desktop-only"
-                aria-label="Download DomusEA App"
-              >
-                <i className="fas fa-mobile-alt"></i>
-                <span>Download App</span>
-                <i className="fas fa-arrow-right"></i>
-              </button>
-            )}
-            
             <div className="branding">
               <div className="logo">🏠 DomusEA</div>
               <div className="tagline">Property Management Redefined</div>
@@ -109,7 +108,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         </div>
       </div>
 
-      {/* Right Side - Login Form (Visible on Mobile & Desktop) */}
+      {/* Right Side - Login Form */}
       <div className="right-panel">
         <div className="login-container">
           {/* Header */}
@@ -127,7 +126,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             </div>
           )}
 
-          {/* ✅ MOBILE DOWNLOAD BANNER (Visible ONLY on Mobile) */}
+          {/* Download App Banner - Mobile Only */}
           {!isAppInstalled && deferredPrompt && (
             <div className="mobile-download-banner">
               <button onClick={handleInstallApp} className="mobile-download-btn">
@@ -313,41 +312,39 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           box-shadow: var(--shadow);
         }
         
-        /* ✅ DESKTOP DOWNLOAD BUTTON (Left Panel) */
-        .download-app-btn.desktop-only {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          padding: 14px 28px;
-          background: rgba(255, 255, 255, 0.15);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          border-radius: 50px;
-          color: white;
-          font-size: 16px;
-          font-weight: 600;
+        /* ✅ DOWNLOAD APP BUTTON - Desktop Top Left */
+        .download-app-btn {
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          z-index: 1000;
+          padding: 10px 20px;
+          background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
+          border: none;
+          border-radius: 8px;
           cursor: pointer;
-          transition: all 0.3s ease;
-          margin: 20px 0;
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          color: white;
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+          transition: all 0.2s;
           animation: pulse-download 2s ease-in-out infinite;
         }
         
-        .download-app-btn.desktop-only:hover {
-          background: rgba(255, 255, 255, 0.25);
-          border-color: rgba(255, 255, 255, 0.5);
-          transform: translateY(-3px);
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        .download-app-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
         }
         
         @keyframes pulse-download {
-          0%, 100% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
-          50% { box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3); }
+          0%, 100% { box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+          50% { box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5); }
         }
         
-        /* ✅ MOBILE DOWNLOAD BANNER (Right Panel) */
+        /* ✅ MOBILE DOWNLOAD BANNER */
         .mobile-download-banner {
           display: none; /* Hidden on Desktop */
           width: 100%;
@@ -450,13 +447,12 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           font-size: 16px;
           line-height: 1.6;
           opacity: 0.95;
-          margin-bottom: 10px;
+          margin-bottom: 40px;
           font-style: italic;
         }
         
         .branding {
-          margin-top: auto;
-          padding-top: 20px;
+          margin-top: 40px;
         }
         
         .logo {
@@ -771,6 +767,10 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           
           .mobile-download-banner {
             display: block; /* Show Mobile Banner on Mobile */
+          }
+          
+          .download-app-btn {
+            display: none; /* Hide Desktop button on Mobile */
           }
         }
         
