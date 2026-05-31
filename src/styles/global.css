@@ -1135,8 +1135,10 @@ tbody tr:last-child td {
   .nav-menu {
     position: absolute;
     top: var(--nav-height);
-    left: 0;
-    right: 0;
+    right: var(--container-padding); /* Align with right edge of container */
+    left: auto; /* Don't stretch from left */
+    width: 280px; /* Fixed width, not full screen */
+    max-width: calc(100vw - 2rem); /* Prevent overflow on small screens */
     background: var(--bg-nav);
     flex-direction: column;
     padding: 1rem;
@@ -1144,15 +1146,19 @@ tbody tr:last-child td {
     gap: 0.25rem;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.3s ease, opacity 0.3s ease;
-    z-index: var(--z-dropdown);
     opacity: 0;
-    border-bottom: 1px solid var(--border-primary);
+    transform: translateY(-10px);
+    transition: max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+    z-index: var(--z-dropdown);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    border: 1px solid var(--border-primary);
+    border-top: none;
   }
   
   .nav-menu.active {
-    max-height: 500px;
+    max-height: 600px; /* Enough height for menu items */
     opacity: 1;
+    transform: translateY(0);
     overflow-y: auto;
   }
   
@@ -1160,6 +1166,8 @@ tbody tr:last-child td {
     width: 100%;
     padding: 0.875rem 1rem;
     font-size: 0.9375rem;
+    border-radius: var(--radius);
+    justify-content: flex-start;
   }
   
   .hamburger {
@@ -1172,6 +1180,24 @@ tbody tr:last-child td {
   
   .theme-toggle span {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --nav-height: 64px;
+    --container-padding: 1rem;
+  }
+  
+  .nav-menu {
+    top: 64px;
+    right: 1rem; /* Maintain spacing from right edge */
+    width: 260px; /* Slightly smaller on mobile */
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .nav-menu a {
+    padding: 0.75rem 1rem;
   }
 }
 

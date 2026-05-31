@@ -72,15 +72,39 @@ const SubscriptionExpired = ({ userProfile, logout }) => (
 );
 
 // ==========================================
+// UPDATE PROMPT COMPONENT (New)
+// ==========================================
+const UpdatePrompt = ({ onRefresh }) => (
+  <div className="fixed bottom-4 right-4 z-[1200] animate-fadeIn">
+    <div className="card p-4 shadow-lg border border-primary">
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-2xl">🔄</span>
+        <div>
+          <h4 className="font-semibold text-primary">Update Available</h4>
+          <p className="text-sm text-muted">A new version is ready</p>
+        </div>
+      </div>
+      <button
+        onClick={onRefresh}
+        className="btn btn-primary btn-sm w-full"
+      >
+        Refresh Now
+      </button>
+    </div>
+  </div>
+);
+
+// ==========================================
 // MAIN APP CONTENT
 // ==========================================
 function AppContent() {
-  const { userProfile, loading, logout, error } = useAuth();
+  const { userProfile, loading, logout, error, refreshAuth } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
 
-  // Initialize theme from localStorage
+  // ✅ Initialize theme from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem('domusea-theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -94,16 +118,16 @@ function AppContent() {
     }
   }, []);
 
-  // Apply theme changes
+  // ✅ Apply theme changes
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     localStorage.setItem('domusea-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  // Toggle theme
+  // ✅ Toggle theme
   const toggleTheme = () => setIsDark(prev => !prev);
 
-  // Close mobile menu on resize
+  // ✅ Close mobile menu on resize
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 768) {
@@ -114,10 +138,69 @@ function AppContent() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Reset active tab when role changes
+  // ✅ Reset active tab when role changes
   useEffect(() => {
     setActiveTab('dashboard');
   }, [userProfile?.role]);
+
+  // ✅ Service Worker Update Detection (New)
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      // Listen for new SW activation
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log('🔄 New service worker activated');
+        setUpdateAvailable(true);
+      });
+
+      // Check for waiting SW on mount
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        if (registration?.waiting) {
+          console.log('⏳ Waiting service worker found');
+          setUpdateAvailable(true);
+        }
+      });
+    }
+
+    // ✅ Listen for visibility change to auto-refresh auth
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && userProfile) {
+        // Optional: refresh auth when tab becomes visible
+        // refreshAuth();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [userProfile]);
+
+  // ✅ Handle update refresh
+  const handleUpdateRefresh = () => {
+    setUpdateAvailable(false);
+    // Force reload to activate new service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        if (reg?.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+    }
+    window.location.reload();
+  };
+
+  // ✅ Handle auth errors with auto-recovery
+  useEffect(() => {
+    if (error && !loading) {
+      console.warn('⚠️ Auth error detected:', error);
+      
+      // Auto-recover on specific errors
+      if (error.includes('expired') || error.includes('invalid')) {
+        console.log('🔄 Attempting auth recovery...');
+        refreshAuth();
+      }
+    }
+  }, [error, loading, refreshAuth]);
 
   // ==========================================
   // LOADING STATE
@@ -460,6 +543,9 @@ function AppContent() {
           aria-hidden="true"
         />
       )}
+
+      {/* ✅ Update Prompt (New) */}
+      {updateAvailable && <UpdatePrompt onRefresh={handleUpdateRefresh} />}
     </div>
   );
 }
