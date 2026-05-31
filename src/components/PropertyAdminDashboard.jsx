@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../AuthContext';  // ✅ Fixed: Changed from './AuthContext' to '../AuthContext'
-import { exportToPDF } from '../utils/pdfExport';
+import { useAuth } from '../AuthContext';
 
 export default function PropertyAdminDashboard() {
   const { userProfile } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [stats, setStats] = useState({
     subscription: null,
     revenue: { confirmed: 0, pending: 0 },
@@ -13,6 +14,24 @@ export default function PropertyAdminDashboard() {
   });
   const [tenants, setTenants] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+
+  const handleSubscriptionPayment = async () => {
+    setPaying(true);
+    try {
+      // This would call your M-Pesa/SasaPay integration
+      console.log("Initiating payment for admin:", userProfile.id);
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      alert("STK Push sent! Please check your phone to complete the payment.");
+      setShowModal(false);
+    } catch (error) {
+      alert("Payment failed. Please try again.");
+    } finally {
+      setPaying(false);
+    }
+  };
 
   useEffect(() => {
     if (userProfile?.id) {
@@ -31,7 +50,6 @@ export default function PropertyAdminDashboard() {
         .eq('id', adminId)
         .single();
 
-      console.log('Subscription result:', subResult);
       const subData = subResult.data;
 
       // 2. Fetch Tenant Count
@@ -40,7 +58,6 @@ export default function PropertyAdminDashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('admin_id', adminId);
 
-      console.log('Count result:', countResult);
       const count = countResult.count;
 
       // 3. Fetch Tenant List
@@ -50,9 +67,7 @@ export default function PropertyAdminDashboard() {
         .eq('admin_id', adminId)
         .order('house');
 
-      console.log('Tenant result:', tenantResult);
       const tenantList = tenantResult.data;
-      console.log('📊 Actual tenants fetched:', tenantList);
 
       // 4. Fetch Payments
       const paymentsResult = await supabase
@@ -61,8 +76,8 @@ export default function PropertyAdminDashboard() {
         .eq('admin_id', adminId);
 
       const payments = paymentsResult.data || [];
-      const confirmed = payments.filter(p => p.status === 'Confirmed').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) || 0;
-      const pending = payments.filter(p => p.status === 'Pending').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) || 0;
+      const confirmed = payments.filter(p => p.status === 'Confirmed').reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
+      const pending = payments.filter(p => p.status === 'Pending').reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
 
       // 5. Fetch Announcements
       const announcementsResult = await supabase
@@ -89,86 +104,71 @@ export default function PropertyAdminDashboard() {
     }
   }
 
-  const downloadTenantPDF = () => {
-    try {
-      if (tenants.length === 0) {
-        alert('No tenants to export');
-        return;
-      }
-      
-      const headers = ['Name', 'House/Unit', 'Rent Amount', 'Payment Status'];
-      const data = tenants.map(t => [
-        t.name || 'N/A',
-        t.house || 'N/A',
-        `KSh ${parseFloat(t.rent || 0).toLocaleString()}`,
-        t.status?.toUpperCase() || 'GOOD'
-      ]);
-      
-      const success = exportToPDF({
-        title: 'Property Tenant Records',
-        filename: 'My_Tenants_List',
-        headers,
-        data,
-        subtitle: `Property Manager: ${userProfile?.name} | Total Tenants: ${tenants.length}`
-      });
-      
-      if (success) {
-        console.log('PDF generated successfully');
-      }
-    } catch (error) {
-      console.error('PDF export error:', error);
-      alert('Failed to download PDF. Please try again.');
-    }
-  };
-
   if (loading) {
     return (
-      <div className="card flex items-center justify-center" style={{ minHeight: '200px' }}>
-        <div className="animate-pulse text-muted font-medium">Loading Dashboard...</div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="animate-fadeIn">
-      {/* Page Header */}
+    <div className="dashboard-wrapper animate-fadeIn">
       <div className="page-header">
-        <h1 className="page-title">Property Admin Dashboard</h1>
-        {tenants.length > 0 && (
-          <button onClick={downloadTenantPDF} className="btn btn-danger">
-            <i className="fas fa-file-pdf"></i>
-            Download Tenant PDF
-          </button>
-        )}
+        <div>
+          <h1 className="page-title">Property Admin Dashboard</h1>
+          <p className="page-subtitle">Manage your properties and tenants</p>
+        </div>
       </div>
 
-      {/* Subscription Card */}
-      <div className="card mb-6" style={{ borderLeft: '4px solid var(--primary)' }}>
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <h3 className="font-semibold text-base mb-1 m-0">Subscription</h3>
-            <p className="text-muted text-sm m-0">
-              {stats.subscription?.subscription_plan || 'N/A'} •{' '}
-              <span className={`badge ${
-                stats.subscription?.subscription_status === 'Active' ? 'badge-success' : 'badge-warning'
-              }`}>
-                {stats.subscription?.subscription_status || 'N/A'}
-              </span>{' '}
-              • Due: {stats.subscription?.subscription_due || 'N/A'}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-primary m-0">
-              KSh {(stats.subscription?.subscription_fee || 0).toLocaleString()}
-            </p>
-            <p className="text-xs text-muted m-0">Monthly Fee</p>
+      {/* Subscription Info Card */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <h3 className="card-title">Subscription Details</h3>
+          <button 
+            className="btn btn-primary btn-sm"
+            onClick={() => setShowModal(true)}
+          >
+            Pay Subscription
+          </button>
+        </div>
+        <div className="card-body">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div>
+              <p className="text-sm text-muted mb-1">Current Plan</p>
+              <p className="font-semibold text-lg">
+                {stats.subscription?.subscription_plan || 'N/A'}
+              </p>
+              <p className="text-sm text-muted mt-1">
+                Status: <span className={`badge ${stats.subscription?.subscription_status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
+                  {stats.subscription?.subscription_status || 'N/A'}
+                </span>
+              </p>
+            </div>
+            
+            <div className="text-right">
+              <p className="text-sm text-muted mb-1">Monthly Fee</p>
+              <p className="text-2xl font-bold text-primary">
+                KSh {stats.subscription?.subscription_fee?.toLocaleString() || '0'}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Due: {stats.subscription?.subscription_due || 'N/A'}
+              </p>
+            </div>
+            
+            <div className="text-right">
+              <p className="text-sm text-muted mb-1">Tenant Limit</p>
+              <p className="text-xl font-semibold">
+                {stats.occupancy.total} / {stats.occupancy.limit}
+              </p>
+              <p className="text-xs text-muted mt-1">Units Occupied</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Revenue & Occupancy Grid */}
-      <div className="stats-grid mb-6">
-        {/* Confirmed Revenue */}
+      {/* Revenue Stats Grid */}
+      <div className="stats-grid">
         <div className="stat-card success">
           <div className="stat-header">
             <div>
@@ -181,14 +181,13 @@ export default function PropertyAdminDashboard() {
               <i className="fas fa-wallet"></i>
             </div>
           </div>
-          <div className="stat-subtitle">Total collected this month</div>
+          <div className="stat-subtitle">From tenant rent payments</div>
         </div>
-
-        {/* Pending Revenue */}
+        
         <div className="stat-card warning">
           <div className="stat-header">
             <div>
-              <div className="stat-label">Pending</div>
+              <div className="stat-label">Pending Payments</div>
               <div className="stat-value text-warning">
                 KSh {stats.revenue.pending.toLocaleString()}
               </div>
@@ -197,57 +196,47 @@ export default function PropertyAdminDashboard() {
               <i className="fas fa-clock"></i>
             </div>
           </div>
-          <div className="stat-subtitle">Awaiting payment</div>
+          <div className="stat-subtitle">Awaiting confirmation</div>
         </div>
-
-        {/* Occupancy */}
+        
         <div className="stat-card">
           <div className="stat-header">
             <div>
-              <div className="stat-label">Occupancy</div>
+              <div className="stat-label">Occupancy Rate</div>
               <div className="stat-value">
-                {stats.occupancy.total} / {stats.occupancy.limit}
+                {stats.occupancy.limit > 0 
+                  ? Math.round((stats.occupancy.total / stats.occupancy.limit) * 100) 
+                  : 0}%
               </div>
             </div>
-            <div className="stat-icon purple">
-              <i className="fas fa-home"></i>
+            <div className="stat-icon blue">
+              <i className="fas fa-chart-pie"></i>
             </div>
           </div>
-          <div className="stat-subtitle">
-            Units Occupied ({stats.occupancy.limit > 0 
-              ? Math.round((stats.occupancy.total / stats.occupancy.limit) * 100) 
-              : 0}%)
-          </div>
+          <div className="stat-subtitle">{stats.occupancy.total} of {stats.occupancy.limit} units</div>
         </div>
       </div>
 
-      {/* Announcements Section */}
+      {/* Announcements */}
       {announcements.length > 0 && (
         <div className="card mb-6">
           <div className="card-header">
-            <i className="fas fa-bullhorn text-primary"></i>
-            <h2 className="card-title">System Announcements</h2>
+            <h3 className="card-title">📢 System Announcements</h3>
           </div>
-          <div className="announcement-list">
-            {announcements.map(a => (
-              <div 
-                key={a.id} 
-                className={`announcement-item ${a.priority === 'High' ? 'important' : ''}`}
-              >
-                <div className="announcement-header">
-                  <span className="announcement-title">{a.subject}</span>
-                  {a.priority && (
-                    <span className={`badge ${
-                      a.priority === 'High' ? 'badge-danger' : 
-                      a.priority === 'Medium' ? 'badge-warning' : 'badge-info'
-                    }`}>
+          <div className="card-body">
+            <div className="announcement-list">
+              {announcements.map(a => (
+                <div key={a.id} className="announcement-item">
+                  <div className="announcement-header">
+                    <span className="announcement-title">{a.subject}</span>
+                    <span className={`badge ${a.priority === 'High' ? 'badge-danger' : a.priority === 'Medium' ? 'badge-warning' : 'badge-muted'}`}>
                       {a.priority}
                     </span>
-                  )}
+                  </div>
+                  <p className="announcement-text">{a.message}</p>
                 </div>
-                <p className="announcement-text">{a.message}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -255,57 +244,101 @@ export default function PropertyAdminDashboard() {
       {/* Tenants Table */}
       <div className="card">
         <div className="card-header">
-          <i className="fas fa-users text-primary"></i>
-          <h2 className="card-title">Your Tenants</h2>
+          <h3 className="card-title">Your Tenants</h3>
+          <span className="text-muted text-sm">{tenants.length} total</span>
         </div>
-        
-        {tenants.length === 0 ? (
-          <div className="text-center py-8">
-            <i className="fas fa-user-slash text-muted" style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block' }}></i>
-            <p className="text-muted">No tenants added yet.</p>
-            <a href="#add-property" className="btn btn-primary btn-sm mt-4">
-              <i className="fas fa-plus"></i> Add Your First Tenant
-            </a>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>House</th>
-                  <th>Rent</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tenants.map(t => (
-                  <tr key={t.id} className="transition">
-                    <td className="font-semibold">{t.name}</td>
-                    <td>
-                      <span className="badge badge-info">{t.house || 'N/A'}</span>
-                    </td>
-                    <td className="text-success font-bold">
-                      KSh {parseFloat(t.rent || 0).toLocaleString()}
-                    </td>
-                    <td>
-                      <span className={`badge ${
-                        t.status === 'good' || !t.status 
-                          ? 'badge-success' 
-                          : t.status === 'pending' 
-                            ? 'badge-warning' 
-                            : 'badge-danger'
-                      }`}>
-                        {t.status?.toUpperCase() || 'GOOD'}
-                      </span>
-                    </td>
+        <div className="card-body">
+          {tenants.length === 0 ? (
+            <div className="text-center py-8 text-muted">
+              <i className="fas fa-users" style={{ fontSize: '2rem', marginBottom: '1rem', display: 'block', opacity: 0.5 }}></i>
+              No tenants added yet
+            </div>
+          ) : (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>House</th>
+                    <th>Rent</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {tenants.map(t => (
+                    <tr key={t.id}>
+                      <td className="font-semibold">{t.name}</td>
+                      <td className="text-muted">{t.house}</td>
+                      <td className="font-bold">KSh {t.rent?.toLocaleString()}</td>
+                      <td>
+                        <span className={`badge ${
+                          t.status === 'good' ? 'badge-success' : 
+                          t.status === 'pending' ? 'badge-warning' : 
+                          'badge-danger'
+                        }`}>
+                          {t.status?.toUpperCase() || 'GOOD'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Payment Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-modal p-4">
+          <div className="card w-full max-w-md animate-fadeIn">
+            <div className="card-header">
+              <h3 className="card-title">Renew Subscription</h3>
+              <button 
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowModal(false)}
+                disabled={paying}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="card-body">
+              <p className="text-secondary mb-4">
+                You are about to pay <strong className="text-primary">KSh {stats.subscription?.subscription_fee?.toLocaleString() || '0'}</strong> for your <strong>{stats.subscription?.subscription_plan}</strong> plan.
+              </p>
+              
+              <div className="form-group">
+                <label className="form-label">Select Payment Method</label>
+                <select className="form-select">
+                  <option>M-Pesa STK Push</option>
+                  <option>SasaPay</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button 
+                  className="btn btn-primary flex-1" 
+                  onClick={handleSubscriptionPayment}
+                  disabled={paying}
+                >
+                  {paying ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin"></i> Processing...
+                    </>
+                  ) : 'Confirm & Pay'}
+                </button>
+                <button 
+                  className="btn btn-secondary flex-1" 
+                  onClick={() => setShowModal(false)}
+                  disabled={paying}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
