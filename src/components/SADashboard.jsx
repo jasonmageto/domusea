@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
+import { exportPaymentsToPDF, exportAdminsToPDF } from '../utils/pdfExport';
 
 export default function SADashboard() {
   const { userProfile } = useAuth();
@@ -63,9 +64,11 @@ export default function SADashboard() {
 
       if (paymentsError) throw paymentsError;
 
-      // Calculate stats
+      // ✅ Calculate stats - FIXED: Case-insensitive status filter
       const now = new Date();
-      const confirmedPayments = paymentsData?.filter(p => p.status === 'Confirmed') || [];
+      const confirmedPayments = paymentsData?.filter(p => 
+        p.status?.toLowerCase() === 'confirmed'
+      ) || [];
       
       const monthlyRevenue = confirmedPayments
         .filter(p => {
@@ -75,7 +78,12 @@ export default function SADashboard() {
         .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
       const totalReceived = confirmedPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-      const pendingPaymentsCount = paymentsData?.filter(p => p.status === 'Pending')?.length || 0;
+      
+      // ✅ FIXED: Case-insensitive pending filter
+      const pendingPaymentsCount = paymentsData?.filter(p => 
+        p.status?.toLowerCase() === 'pending'
+      )?.length || 0;
+      
       const activeAdmins = adminsData?.filter(a => a.subscription_status === 'Active') || [];
 
       setStats({
@@ -98,6 +106,21 @@ export default function SADashboard() {
       setLoading(false);
     }
   }
+
+  // ✅ Download handlers
+  const handleDownloadPayments = () => {
+    exportPaymentsToPDF(
+      recentPayments, 
+      `payments_${new Date().toISOString().split('T')[0]}.pdf`
+    );
+  };
+
+  const handleDownloadAdmins = () => {
+    exportAdminsToPDF(
+      activeAdminsList, 
+      `admins_${new Date().toISOString().split('T')[0]}.pdf`
+    );
+  };
 
   const formatCurrency = (amount) => `KSh ${(parseFloat(amount) || 0).toLocaleString()}`;
   const formatDate = (dateString) => {
@@ -184,7 +207,16 @@ export default function SADashboard() {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Recent Payments</h3>
-            <span className="text-muted text-sm">Last 10</span>
+            <div className="flex gap-2">
+              <span className="text-muted text-sm">Last 10</span>
+              <button 
+                onClick={handleDownloadPayments}
+                className="btn btn-sm btn-primary"
+                title="Download PDF"
+              >
+                <i className="fas fa-download"></i> Download
+              </button>
+            </div>
           </div>
           
           {recentPayments.length === 0 ? (
@@ -207,7 +239,7 @@ export default function SADashboard() {
                       </td>
                       <td className="font-bold">{formatCurrency(payment.amount)}</td>
                       <td>
-                        <span className={`badge ${payment.status === 'Confirmed' ? 'badge-success' : 'badge-warning'}`}>
+                        <span className={`badge ${payment.status?.toLowerCase() === 'confirmed' ? 'badge-success' : 'badge-warning'}`}>
                           {payment.status || 'Pending'}
                         </span>
                       </td>
@@ -223,7 +255,16 @@ export default function SADashboard() {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Active Admins</h3>
-            <span className="text-muted text-sm">Top 5</span>
+            <div className="flex gap-2">
+              <span className="text-muted text-sm">Top 5</span>
+              <button 
+                onClick={handleDownloadAdmins}
+                className="btn btn-sm btn-primary"
+                title="Download PDF"
+              >
+                <i className="fas fa-download"></i> Download
+              </button>
+            </div>
           </div>
           
           {activeAdminsList.length === 0 ? (

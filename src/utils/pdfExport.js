@@ -1,157 +1,152 @@
-export const exportToPDF = async ({
-  title,
-  subtitle,
-  headers,
-  data,
-  filename = 'export'
-}) => {
-  try {
-    // Create HTML content
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${title}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 40px;
-              color: #1e293b;
-            }
-            .header {
-              background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-              color: white;
-              padding: 30px;
-              border-radius: 8px;
-              margin-bottom: 30px;
-            }
-            .header h1 {
-              margin: 0 0 10px 0;
-              font-size: 28px;
-            }
-            .header p {
-              margin: 0;
-              opacity: 0.9;
-            }
-            .date {
-              text-align: right;
-              color: #64748b;
-              font-size: 12px;
-              margin-bottom: 20px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 20px;
-            }
-            th {
-              background-color: #4f46e5;
-              color: white;
-              padding: 12px;
-              text-align: left;
-              font-weight: 600;
-            }
-            td {
-              padding: 12px;
-              border-bottom: 1px solid #e2e8f0;
-            }
-            tr:nth-child(even) {
-              background-color: #f8fafc;
-            }
-            tr:hover {
-              background-color: #f1f5f9;
-            }
-            .badge {
-              display: inline-block;
-              padding: 4px 12px;
-              border-radius: 12px;
-              font-size: 12px;
-              font-weight: 600;
-            }
-            .badge-success {
-              background-color: #d1fae5;
-              color: #065f46;
-            }
-            .badge-warning {
-              background-color: #fef3c7;
-              color: #92400e;
-            }
-            .badge-danger {
-              background-color: #fee2e2;
-              color: #991b1b;
-            }
-            .footer {
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 2px solid #e2e8f0;
-              text-align: center;
-              color: #64748b;
-              font-size: 12px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>${title}</h1>
-            <p>${subtitle || ''}</p>
-          </div>
-          <div class="date">Generated: ${new Date().toLocaleDateString('en-KE', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}</div>
-          <table>
-            <thead>
-              <tr>
-                ${headers.map(h => `<th>${h}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${data.map(row => `
-                <tr>
-                  ${row.map(cell => {
-                    const isStatus = cell === 'GOOD' || cell === 'ACTIVE' || 
-                                    cell === 'PENDING' || cell === 'OVERDUE';
-                    let badgeClass = '';
-                    if (isStatus) {
-                      if (cell === 'GOOD' || cell === 'ACTIVE') badgeClass = 'badge-success';
-                      else if (cell === 'PENDING') badgeClass = 'badge-warning';
-                      else badgeClass = 'badge-danger';
-                      return `<td><span class="badge ${badgeClass}">${cell}</span></td>`;
-                    }
-                    return `<td>${cell}</td>`;
-                  }).join('')}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="footer">
-            <p>DomusEA Property Management System</p>
-            <p>Total Records: ${data.length}</p>
-          </div>
-        </body>
-      </html>
-    `;
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
-    // Open in new window for printing
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+// ✅ Generic export function used by ManageAdmins
+export const exportToPDF = ({ title, filename = 'report.pdf', headers, data, subtitle = '' }) => {
+  try {
+    const doc = new jsPDF();
     
-    // Wait for content to load
-    printWindow.onload = () => {
-      printWindow.print();
-      // Optionally close after print
-      // printWindow.close();
-    };
+    // Title
+    doc.setFontSize(18);
+    doc.text(title, 14, 20);
     
+    // Subtitle if provided
+    if (subtitle) {
+      doc.setFontSize(11);
+      doc.text(subtitle, 14, 30);
+    }
+    
+    // Date
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, subtitle ? 40 : 30);
+    
+    // Table
+    doc.autoTable({
+      startY: subtitle ? 50 : 40,
+      head: [headers],
+      body: data,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 60 }
+      }
+    });
+    
+    doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`);
     return true;
   } catch (error) {
-    console.error('Error generating PDF:', error);
-    alert('Failed to generate PDF. Please try again.');
+    console.error('PDF export error:', error);
+    alert('Failed to generate PDF');
+    return false;
+  }
+};
+
+// ✅ Specific export functions for SADashboard
+export const exportPaymentsToPDF = (payments, filename = 'payments.pdf') => {
+  try {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('DomusEA - Payment Report', 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    
+    const tableData = payments.map(p => [
+      p.admins?.name || 'Unknown',
+      `KSh ${(parseFloat(p.amount) || 0).toLocaleString()}`,
+      p.status || 'Pending',
+      new Date(p.date).toLocaleDateString('en-KE')
+    ]);
+    
+    doc.autoTable({
+      startY: 40,
+      head: [['Admin', 'Amount', 'Status', 'Date']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] },
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 50 }
+      }
+    });
+    
+    doc.save(filename);
+    return true;
+  } catch (error) {
+    console.error('PDF export error:', error);
+    alert('Failed to generate PDF');
+    return false;
+  }
+};
+
+export const exportAdminsToPDF = (admins, filename = 'admins.pdf') => {
+  try {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('DomusEA - Active Admins Report', 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    
+    const tableData = admins.map(a => [
+      a.name || 'Unknown',
+      a.email,
+      a.subscription_plan || 'Monthly',
+      `KSh ${(parseFloat(a.subscription_fee) || 0).toLocaleString()}`,
+      a.subscription_status || 'N/A'
+    ]);
+    
+    doc.autoTable({
+      startY: 40,
+      head: [['Name', 'Email', 'Plan', 'Fee', 'Status']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+    
+    doc.save(filename);
+    return true;
+  } catch (error) {
+    console.error('PDF export error:', error);
+    alert('Failed to generate PDF');
+    return false;
+  }
+};
+
+export const exportTenantsToPDF = (tenants, filename = 'tenants.pdf') => {
+  try {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('DomusEA - Tenants Report', 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    
+    const tableData = tenants.map(t => [
+      t.name || 'Unknown',
+      t.email,
+      t.property || 'N/A',
+      t.house || 'N/A',
+      `KSh ${(parseFloat(t.rent) || 0).toLocaleString()}`,
+      t.status || 'N/A'
+    ]);
+    
+    doc.autoTable({
+      startY: 40,
+      head: [['Name', 'Email', 'Property', 'House', 'Rent', 'Status']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+    
+    doc.save(filename);
+    return true;
+  } catch (error) {
+    console.error('PDF export error:', error);
+    alert('Failed to generate PDF');
     return false;
   }
 };

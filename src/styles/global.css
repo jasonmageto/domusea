@@ -1135,10 +1135,10 @@ tbody tr:last-child td {
   .nav-menu {
     position: absolute;
     top: var(--nav-height);
-    right: var(--container-padding); /* Align with right edge of container */
-    left: auto; /* Don't stretch from left */
-    width: 280px; /* Fixed width, not full screen */
-    max-width: calc(100vw - 2rem); /* Prevent overflow on small screens */
+    right: var(--container-padding);
+    left: auto;
+    width: 280px;
+    max-width: calc(100vw - 2rem);
     background: var(--bg-nav);
     flex-direction: column;
     padding: 1rem;
@@ -1156,7 +1156,7 @@ tbody tr:last-child td {
   }
   
   .nav-menu.active {
-    max-height: 600px; /* Enough height for menu items */
+    max-height: 600px;
     opacity: 1;
     transform: translateY(0);
     overflow-y: auto;
@@ -1191,24 +1191,9 @@ tbody tr:last-child td {
   
   .nav-menu {
     top: 64px;
-    right: 1rem; /* Maintain spacing from right edge */
-    width: 260px; /* Slightly smaller on mobile */
+    right: 1rem;
+    width: 260px;
     max-width: calc(100vw - 2rem);
-  }
-  
-  .nav-menu a {
-    padding: 0.75rem 1rem;
-  }
-}
-
-@media (max-width: 768px) {
-  :root {
-    --nav-height: 64px;
-    --container-padding: 1rem;
-  }
-  
-  .nav-menu {
-    top: 64px;
   }
   
   .nav-menu a {
@@ -1304,4 +1289,63 @@ tbody tr:last-child td {
     box-shadow: none; 
     break-inside: avoid; 
   }
+}
+
+/* ==========================================
+   ✅ DARK MODE RESPONSE/COMPLAINT FIX
+   Ensures response text is visible in dark mode
+   ========================================== */
+
+[data-theme="dark"] .response-box,
+[data-theme="dark"] .resolved-response,
+[data-theme="dark"] .complaint-response,
+[data-theme="dark"] [class*="response"],
+[data-theme="dark"] .admin-reply,
+[data-theme="dark"] .resolution-text {
+  color: var(--text-secondary) !important;
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+[data-theme="dark"] .response-box p,
+[data-theme="dark"] .response-box span,
+[data-theme="dark"] .response-box small,
+[data-theme="dark"] .response-box div,
+[data-theme="dark"] .response-box strong,
+[data-theme="dark"] .admin-reply p,
+[data-theme="dark"] .admin-reply span {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .response-box .badge-success,
+[data-theme="dark"] .response-box .status-resolved,
+[data-theme="dark"] .response-box h4,
+[data-theme="dark"] .response-box h5,
+[data-theme="dark"] .admin-reply .badge-success {
+  color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* Fix for any inline styles that might override */
+[data-theme="dark"] [style*="background:#ecfdf5"],
+[data-theme="dark"] [style*="background: rgb(236, 253, 245)"],
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background: #fff"] {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* Ensure links inside responses are visible */
+[data-theme="dark"] .response-box a,
+[data-theme="dark"] .admin-reply a {
+  color: var(--primary-light) !important;
+  text-decoration: none;
+}
+[data-theme="dark"] .response-box a:hover,
+[data-theme="dark"] .admin-reply a:hover {
+  color: var(--primary) !important;
+  text-decoration: underline;
 }

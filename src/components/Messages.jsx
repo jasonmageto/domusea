@@ -12,9 +12,9 @@ export default function Messages() {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
-  const [recipientType, setRecipientType] = useState('');
   const [admins, setAdmins] = useState([]);
   const [tenants, setTenants] = useState([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -100,7 +100,6 @@ export default function Messages() {
     if (!selectedConversation) return;
     
     try {
-      // Use a simpler OR query to avoid complex 'and' nesting that might cause 400 errors
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -109,13 +108,11 @@ export default function Messages() {
 
       if (error) throw error;
 
-      // Filter locally for the specific conversation
       const filteredMessages = data?.filter(m => 
         (m.from_id === userProfile.id && m.to_id === selectedConversation.otherUserId) ||
         (m.from_id === selectedConversation.otherUserId && m.to_id === userProfile.id)
       ) || [];
 
-      // Mark unread messages as read in a single batch update to prevent throttling/errors
       const unreadIds = filteredMessages
         .filter(m => m.to_id === userProfile.id && !m.read)
         .map(m => m.id);
@@ -138,62 +135,56 @@ export default function Messages() {
   const loadRecipients = async () => {
     try {
       console.log('🔄 Loading recipients for role:', userProfile?.role, 'User ID:', userProfile?.id);
+      setRecipientsLoading(true);
       
       let filteredAdmins = [];
       let filteredTenants = [];
       
-      if (userProfile?.role === 'sa') {
-        console.log('📡 SA fetching all admins...');
+      // ✅ FIXED: Changed 'sa' to 'supreme_admin'
+      if (userProfile?.role === 'supreme_admin') {
+        console.log('📡 Supreme Admin fetching all admins...');
         
         const { data: allAdmins, error: adminsError } = await supabase
           .from('admins')
-          .select('id, name, email');
+          .select('id, name, email, subscription_status')
+          .neq('id', userProfile.id);
         
         if (adminsError) {
           console.error('❌ Admins fetch error:', adminsError);
           toast.error('Failed to load admins: ' + adminsError.message);
         } else {
-          filteredAdmins = (allAdmins || []).filter(a => a.id !== userProfile.id);
-        }
-        
-        const { data: allTenants, error: tenantsError } = await supabase
-          .from('tenants')
-          .select('id, name, email, house, property');
-        
-        if (tenantsError) {
-          console.error('❌ Tenants fetch error:', tenantsError);
-        } else {
-          filteredTenants = allTenants || [];
+          console.log('✅ Admins loaded:', allAdmins?.length || 0);
+          filteredAdmins = allAdmins || [];
         }
         
       } else if (userProfile?.role === 'admin') {
-        const { data: selfAdmin, error } = await supabase
-          .from('admins')
-          .select('id, name, email')
-          .eq('id', userProfile.id)
-          .single();
-        
-        if (!error) {
-          filteredAdmins = selfAdmin ? [selfAdmin] : [];
-        }
+        console.log(' Admin fetching tenants...');
         
         const { data: myTenants, error: tErr } = await supabase
           .from('tenants')
           .select('id, name, email, house, property')
           .eq('admin_id', userProfile.id);
         
-        if (!tErr) {
+        if (tErr) {
+          console.error('❌ Tenants fetch error:', tErr);
+        } else {
+          console.log('✅ Tenants loaded:', myTenants?.length || 0);
           filteredTenants = myTenants || [];
         }
         
       } else if (userProfile?.role === 'tenant') {
+        console.log('🏠 Tenant fetching admin...');
+        
         const { data: adminData, error } = await supabase
           .from('admins')
           .select('id, name, email')
           .eq('id', userProfile.admin_id)
           .single();
         
-        if (!error) {
+        if (error) {
+          console.error('❌ Admin fetch error:', error);
+        } else {
+          console.log('✅ Admin loaded:', adminData?.name);
           filteredAdmins = adminData ? [adminData] : [];
         }
       }
@@ -204,68 +195,60 @@ export default function Messages() {
       
     } catch (err) {
       console.error('❌ loadRecipients error:', err);
-      console.error('Error stack:', err.stack);
       toast.error('Failed to load recipients: ' + err.message);
+    } finally {
+      setRecipientsLoading(false);
     }
   };
 
- const handleSendMessage = async () => {
-  if (!newMessage.trim() || !selectedConversation) return;
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation) return;
 
-  console.log('📤 Sending message to:', selectedConversation.userName);
-  setSending(true);
-  
-  try {
-    // Simplified payload - only required + essential fields
-    const payload = {
-      from_id: userProfile.id,
-      from_name: userProfile.name || 'User',
-      from_email: userProfile.email || null,
-      to_id: selectedConversation.otherUserId,
-      to_name: selectedConversation.userName || 'User',
-      to_email: selectedConversation.userEmail || null,
-      admin_id: userProfile.role === 'admin' ? userProfile.id : 
-                userProfile.role === 'sa' ? selectedConversation.otherUserId : null,
-      tenant_id: userProfile.role === 'tenant' ? userProfile.id : 
-                 userProfile.role === 'sa' ? selectedConversation.otherUserId : null,
-      message: newMessage.trim(),
-      date: new Date().toISOString(),
-      read: false
-      // Removed 'subject' for now - add back if needed
-    };
+    console.log('📤 Sending message to:', selectedConversation.userName);
+    setSending(true);
+    
+    try {
+      const payload = {
+        from_id: userProfile.id,
+        from_name: userProfile.name || 'User',
+        from_email: userProfile.email || null,
+        to_id: selectedConversation.otherUserId,
+        to_name: selectedConversation.userName || 'User',
+        to_email: selectedConversation.userEmail || null,
+        // ✅ FIXED: Updated role check
+        admin_id: userProfile.role === 'admin' ? userProfile.id : 
+                  userProfile.role === 'supreme_admin' ? selectedConversation.otherUserId : null,
+        tenant_id: userProfile.role === 'tenant' ? userProfile.id : 
+                   userProfile.role === 'supreme_admin' ? selectedConversation.otherUserId : null,
+        message: newMessage.trim(),
+        date: new Date().toISOString(),
+        read: false
+      };
 
-    console.log('📦 Insert payload:', payload);
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([payload])
+        .select();
 
-    const { data, error } = await supabase
-      .from('messages')
-      .insert([payload])
-      .select(); // Always select to get the inserted row back
-
-    if (error) {
-      console.error('❌ Supabase Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-      throw error;
+      if (error) {
+        console.error('❌ Supabase Error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Message sent:', data[0]);
+      toast.success('Message sent!');
+      setNewMessage('');
+      
+      setMessages(prev => [...prev, data[0]]);
+      loadConversations();
+      
+    } catch (err) {
+      console.error('❌ Send failed:', err);
+      toast.error('Failed to send: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSending(false);
     }
-    
-    console.log('✅ Message sent:', data[0]);
-    toast.success('Message sent!');
-    setNewMessage('');
-    
-    // Update local state immediately
-    setMessages(prev => [...prev, data[0]]);
-    loadConversations();
-    
-  } catch (err) {
-    console.error('❌ Send failed:', err);
-    toast.error('Failed to send: ' + (err.message || 'Unknown error'));
-  } finally {
-    setSending(false);
-  }
-};
+  };
 
   const startNewConversation = async (recipientId, recipientName, recipientEmail) => {
     setSelectedConversation({
@@ -453,12 +436,12 @@ export default function Messages() {
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-             onKeyDown={(e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    handleSendMessage();
-  }
-}}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
               placeholder="Write your professional message..."
               rows={1}
               style={{
@@ -580,7 +563,7 @@ export default function Messages() {
           </div>
         ) : conversations.length === 0 ? (
           <div key="empty" style={{ padding: 60, textAlign: 'center', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+            <div style={{ fontSize: 48, marginBottom: 16 }}></div>
             <div style={{ fontSize: 16, marginBottom: 8 }}>No messages yet</div>
             <div style={{ fontSize: 14 }}>Start a conversation!</div>
           </div>
@@ -694,7 +677,7 @@ export default function Messages() {
             background: isDarkMode ? '#1e293b' : 'white',
             borderRadius: 16,
             padding: 24,
-            maxWidth: 600,
+            maxWidth: 700,
             width: '100%',
             maxHeight: '80vh',
             overflow: 'auto'
@@ -705,7 +688,12 @@ export default function Messages() {
               alignItems: 'center',
               marginBottom: 20
             }}>
-              <h3 style={{ margin: 0, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>New Message</h3>
+              <h3 style={{ margin: 0, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
+                {/* ✅ FIXED: Role check updated */}
+                {userProfile.role === 'supreme_admin' ? ' Send Message to Property Admin' : 
+                 userProfile.role === 'admin' ? '📨 Send Message to Tenant' : 
+                 '📨 Send Message to Property Admin'}
+              </h3>
               <button
                 onClick={() => setShowNewMessageModal(false)}
                 style={{
@@ -720,168 +708,270 @@ export default function Messages() {
               </button>
             </div>
 
-            {/* 🔧 Debug Panel */}
-            <div style={{ padding: 20, background: '#fee2e2', borderRadius: 8, marginBottom: 20 }}>
-              <h4 style={{ margin: '0 0 12px 0', color: '#dc2626' }}>🐛 Debug Mode</h4>
-              <div style={{ marginBottom: 8 }}>
-                <strong>User Profile:</strong>
-                <pre style={{ 
-                  background: 'white', 
-                  padding: 8, 
-                  borderRadius: 4, 
-                  fontSize: 12,
-                  overflow: 'auto',
-                  maxHeight: 150
-                }}>
-                  {JSON.stringify(userProfile, null, 2)}
-                </pre>
-              </div>
-              <div style={{ marginBottom: 8 }}>
-                <strong>Current State - Admins:</strong> {admins.length}, <strong>Tenants:</strong> {tenants.length}
-              </div>
-              <button 
-                onClick={async () => {
-  console.log('🧪 Manual test query...');
-  const {  testAdmins, error } = await supabase
-    .from('admins')
-    .select('*');
-  console.log('✅ Test result:', testAdmins, 'Error:', error);
-  
-  if (error) {
-    alert(`Error: ${error.message}\nDetails: ${error.details || 'none'}`);
-  } else {
-    alert(`Found ${testAdmins?.length || 0} admins\nData: ${JSON.stringify(testAdmins, null, 2)}`);
-  }
-}}
-                style={{
-                  padding: '8px 16px',
-                  background: '#dc2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  marginRight: 8
-                }}
-              >
-                Test Query
-              </button>
-              <button 
-                onClick={loadRecipients}
-                style={{
-                  padding: '8px 16px',
-                  background: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: 'pointer'
-                }}
-              >
-                Retry Load
-              </button>
-            </div>
-
-            {!recipientType && admins.length === 0 && tenants.length === 0 && (
+            {recipientsLoading && (
               <div style={{ textAlign: 'center', padding: 40, color: isDarkMode ? '#94a3b8' : '#64748b' }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
                 <div>Loading recipients...</div>
-                <div style={{ fontSize: 12, marginTop: 8 }}>Check console for details</div>
               </div>
             )}
 
-            {!recipientType && (admins.length > 0 || tenants.length > 0) && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {userProfile.role === 'sa' && admins.length > 0 && (
-                  <button
-                    key="admin-btn"
-                    onClick={() => setRecipientType('admin')}
-                    style={{
-                      padding: 24,
-                      background: isDarkMode ? '#334155' : '#f8fafc',
-                      border: `2px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
-                      borderRadius: 12,
-                      cursor: 'pointer',
-                      textAlign: 'center'
-                    }}
-                  >
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>👔</div>
-                    <div style={{ fontWeight: 600, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>Admin</div>
-                    <div style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>{admins.length} available</div>
-                  </button>
-                )}
-                
-                {(userProfile.role === 'admin' || userProfile.role === 'sa') && tenants.length > 0 && (
-                  <button
-                    key="tenant-btn"
-                    onClick={() => setRecipientType('tenant')}
-                    style={{
-                      padding: 24,
-                      background: isDarkMode ? '#334155' : '#f8fafc',
-                      border: `2px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
-                      borderRadius: 12,
-                      cursor: 'pointer',
-                      textAlign: 'center'
-                    }}
-                  >
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>🏠</div>
-                    <div style={{ fontWeight: 600, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>Tenant</div>
-                    <div style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>{tenants.length} available</div>
-                  </button>
-                )}
-              </div>
-            )}
-
-            {recipientType && (
+            {/* ✅ FIXED: Supreme Admin recipient list */}
+            {!recipientsLoading && userProfile.role === 'supreme_admin' && admins.length > 0 && (
               <div>
-                <button
-                  onClick={() => setRecipientType('')}
-                  style={{
-                    marginBottom: 16,
-                    background: 'none',
-                    border: 'none',
-                    color: '#3b82f6',
-                    cursor: 'pointer',
-                    fontSize: 14
-                  }}
-                >
-                  ← Back
-                </button>
-                
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {(recipientType === 'admin' ? admins : tenants).map((person) => (
+                <div style={{ 
+                  marginBottom: 16, 
+                  padding: 12, 
+                  background: isDarkMode ? '#334155' : '#f1f5f9',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  color: isDarkMode ? '#cbd5e1' : '#475569'
+                }}>
+                  Select a Property Admin to message
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {admins.map((admin) => (
                     <button
-                      key={person.id}
-                      onClick={() => startNewConversation(person.id, person.name, person.email)}
+                      key={admin.id}
+                      onClick={() => startNewConversation(admin.id, admin.name, admin.email)}
                       style={{
-                        padding: '12px 16px',
+                        padding: '16px',
                         background: isDarkMode ? '#334155' : '#f8fafc',
-                        border: `1px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
-                        borderRadius: 8,
+                        border: `2px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                        borderRadius: 12,
                         cursor: 'pointer',
                         textAlign: 'left',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 12
+                        gap: 16,
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = isDarkMode ? '#475569' : '#e2e8f0';
+                        e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
                       <div style={{
-                        width: 40,
-                        height: 40,
+                        width: 48,
+                        height: 48,
                         background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
                         borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: 'white',
-                        fontWeight: 'bold'
+                        fontWeight: 'bold',
+                        fontSize: 18,
+                        flexShrink: 0
                       }}>
-                        {person.name.charAt(0).toUpperCase()}
+                        {admin.name.charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>{person.name}</div>
-                        <div style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>{person.email}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 16, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
+                          {admin.name}
+                        </div>
+                        <div style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                          {admin.email}
+                        </div>
+                        {admin.subscription_status && (
+                          <div style={{ 
+                            fontSize: 12, 
+                            color: admin.subscription_status === 'Active' ? '#10b981' : '#ef4444',
+                            marginTop: 4 
+                          }}>
+                            {admin.subscription_status === 'Active' ? '✓ Active' : '⚠ Inactive'}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{
+                        fontSize: 20,
+                        color: isDarkMode ? '#64748b' : '#94a3b8'
+                      }}>
+                        →
                       </div>
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Property Admin: Show Tenants */}
+            {!recipientsLoading && userProfile.role === 'admin' && tenants.length > 0 && (
+              <div>
+                <div style={{ 
+                  marginBottom: 16, 
+                  padding: 12, 
+                  background: isDarkMode ? '#334155' : '#f1f5f9',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  color: isDarkMode ? '#cbd5e1' : '#475569'
+                }}>
+                  Select a tenant to message
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {tenants.map((tenant) => (
+                    <button
+                      key={tenant.id}
+                      onClick={() => startNewConversation(tenant.id, tenant.name, tenant.email)}
+                      style={{
+                        padding: '16px',
+                        background: isDarkMode ? '#334155' : '#f8fafc',
+                        border: `2px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 16,
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = isDarkMode ? '#475569' : '#e2e8f0';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <div style={{
+                        width: 48,
+                        height: 48,
+                        background: 'linear-gradient(135deg, #10b981, #3b82f6)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: 18,
+                        flexShrink: 0
+                      }}>
+                        {tenant.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 16, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
+                          {tenant.name}
+                        </div>
+                        <div style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                          {tenant.email}
+                        </div>
+                        {(tenant.property || tenant.house) && (
+                          <div style={{ fontSize: 12, color: isDarkMode ? '#64748b' : '#94a3b8', marginTop: 4 }}>
+                            {tenant.property} - {tenant.house}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{
+                        fontSize: 20,
+                        color: isDarkMode ? '#64748b' : '#94a3b8'
+                      }}>
+                        →
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tenant: Show Property Admin */}
+            {!recipientsLoading && userProfile.role === 'tenant' && admins.length > 0 && (
+              <div>
+                <div style={{ 
+                  marginBottom: 16, 
+                  padding: 12, 
+                  background: isDarkMode ? '#334155' : '#f1f5f9',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  color: isDarkMode ? '#cbd5e1' : '#475569'
+                }}>
+                  Your Property Admin
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {admins.map((admin) => (
+                    <button
+                      key={admin.id}
+                      onClick={() => startNewConversation(admin.id, admin.name, admin.email)}
+                      style={{
+                        padding: '16px',
+                        background: isDarkMode ? '#334155' : '#f8fafc',
+                        border: `2px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 16,
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = isDarkMode ? '#475569' : '#e2e8f0';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <div style={{
+                        width: 48,
+                        height: 48,
+                        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: 18,
+                        flexShrink: 0
+                      }}>
+                        {admin.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 16, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
+                          {admin.name}
+                        </div>
+                        <div style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                          {admin.email}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#10b981', marginTop: 4 }}>
+                          ✓ Property Admin
+                        </div>
+                      </div>
+                      <div style={{
+                        fontSize: 20,
+                        color: isDarkMode ? '#64748b' : '#94a3b8'
+                      }}>
+                        →
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No Recipients Found */}
+            {!recipientsLoading && (
+              (userProfile.role === 'supreme_admin' && admins.length === 0) ||
+              (userProfile.role === 'admin' && tenants.length === 0) ||
+              (userProfile.role === 'tenant' && admins.length === 0)
+            ) && (
+              <div style={{ textAlign: 'center', padding: 40, color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>
+                  {userProfile.role === 'admin' ? '🏠' : '👤'}
+                </div>
+                <div style={{ fontSize: 16, marginBottom: 8 }}>
+                  {userProfile.role === 'supreme_admin' ? 'No Property Admins found' :
+                   userProfile.role === 'admin' ? 'No active tenants found' :
+                   'No Property Admin assigned'}
+                </div>
+                <div style={{ fontSize: 14 }}>
+                  {userProfile.role === 'admin' ? 'Add tenants to start messaging' : 
+                   'Please contact support'}
                 </div>
               </div>
             )}
