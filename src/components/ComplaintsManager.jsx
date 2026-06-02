@@ -108,7 +108,7 @@ export default function ComplaintsManager() {
     <div>
       <div style={{marginBottom: 24}}>
         <h2 style={{margin: '0 0 8px 0', fontSize: 24}}>⚠️ Tenant Complaints</h2>
-        <p style={{margin: 0, color: 'var(--gray)'}}>
+        <p style={{margin: 0, color: 'var(--text-muted)'}}>
           {complaints.filter(c => c.status !== 'Resolved').length} open complaint{complaints.filter(c => c.status !== 'Resolved').length !== 1 ? 's' : ''}
         </p>
       </div>
@@ -119,47 +119,48 @@ export default function ComplaintsManager() {
           
           return (
             <div key={c.id} className="card" style={{
-              borderLeft: isResolved ? '4px solid var(--green)' : '4px solid var(--amber)',
+              borderLeft: isResolved ? '4px solid var(--success)' : '4px solid var(--warning)',
               padding: 20
             }}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'start', marginBottom:12}}>
                 <div>
                   <strong style={{fontSize: 16}}>{c.tenants?.name || 'Tenant'}</strong>
-                  <span style={{color: 'var(--gray)', marginLeft: 8}}>
+                  <span style={{color: 'var(--text-muted)', marginLeft: 8}}>
                     ({c.tenants?.house || 'Unit'})
                   </span>
                 </div>
-                <span className={`badge ${isResolved ? 'status-green' : 'status-amber'}`}>
+                <span className={`badge ${isResolved ? 'badge-success' : 'badge-warning'}`}>
                   {c.status}
                 </span>
               </div>
               
               <div style={{marginBottom: 12}}>
                 <p style={{margin: '4px 0', fontWeight: 600}}>{c.subject}:</p>
-                <p style={{margin: '4px 0', color: 'var(--text)'}}>{c.message}</p>
+                <p style={{margin: '4px 0', color: 'var(--text-secondary)'}}>{c.message}</p>
               </div>
               
-              <div style={{fontSize: 12, color: 'var(--gray)', marginBottom: 12}}>
+              <div style={{fontSize: 12, color: 'var(--text-muted)', marginBottom: 12}}>
                 Submitted: {new Date(c.date || c.created_at).toLocaleString()}
               </div>
               
               {isResolved ? (
-                <div style={{
+                <div className="response-box resolved-response" style={{
                   padding: 12,
-                  background: '#f0fff4',
+                  background: 'var(--success-bg)',
                   borderRadius: 8,
-                  border: '1px solid var(--green)'
+                  border: '1px solid var(--success)',
+                  color: 'var(--text-secondary)'
                 }}>
-                  <p style={{margin: 0, fontWeight: 600, color: 'var(--green)'}}>
+                  <p style={{margin: 0, fontWeight: 600, color: 'var(--success)'}}>
                     ✅ Resolved
                   </p>
                   {c.response && (
-                    <p style={{margin: '8px 0 0 0', fontStyle: 'italic', color: 'var(--text)'}}>
+                    <p style={{margin: '8px 0 0 0', fontStyle: 'italic', color: 'var(--text-secondary)'}}>
                       <strong>Your Response:</strong> {c.response}
                     </p>
                   )}
                   {c.resolved_at && (
-                    <p style={{margin: '4px 0 0 0', fontSize: 12, color: 'var(--gray)'}}>
+                    <p style={{margin: '4px 0 0 0', fontSize: 12, color: 'var(--text-muted)'}}>
                       Resolved at: {new Date(c.resolved_at).toLocaleString()}
                     </p>
                   )}
@@ -184,8 +185,10 @@ export default function ComplaintsManager() {
                         flex:1, 
                         padding: '10px 14px', 
                         borderRadius: 6, 
-                        border:'1px solid var(--border)',
-                        fontSize: 14
+                        border:'1px solid var(--border-primary)',
+                        fontSize: 14,
+                        background: 'var(--bg-input)',
+                        color: 'var(--text-primary)'
                       }} 
                     />
                     <button 
@@ -210,7 +213,7 @@ export default function ComplaintsManager() {
         {complaints.length === 0 && (
           <div className="card" style={{textAlign:'center', padding: 40}}>
             <div style={{fontSize: 48, marginBottom: 16}}>✅</div>
-            <p style={{margin: 0, color: 'var(--gray)'}}>
+            <p style={{margin: 0, color: 'var(--text-muted)'}}>
               No complaints from your tenants. Great job!
             </p>
           </div>
