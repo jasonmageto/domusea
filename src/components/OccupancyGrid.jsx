@@ -40,18 +40,39 @@ export default function OccupancyGrid() {
       if (adminError) throw adminError;
       const limit = adminData?.tenant_limit || 50;
       setTenantLimit(limit);
-      console.log('Tenant limit:', limit);
 
-      // Get all ACTIVE tenants for this admin
+      // Get all tenants for this admin (not just active ones)
       const { data: tenantsData, error: tenantsError } = await supabase
         .from('tenants')
         .select('*')
-        .eq('admin_id', userProfile.id)
-        .in('status', ['Active', 'Paid', 'Pending']);
+        .eq('admin_id', userProfile.id);
       
       if (tenantsError) throw tenantsError;
-      setTenants(tenantsData || []);
-      console.log('Active tenants:', tenantsData?.length);
+
+      // Fetch payments for all tenants
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('admin_id', userProfile.id)
+        .order('date', { ascending: false });
+      
+      if (paymentsError) throw paymentsError;
+      
+      // Create a map of tenant_id to their latest payment
+      const latestPayments = {};
+      paymentsData?.forEach(payment => {
+        if (!latestPayments[payment.tenant_id]) {
+          latestPayments[payment.tenant_id] = payment;
+        }
+      });
+      
+      // Attach latest payment to each tenant
+      const tenantsWithPayments = (tenantsData || []).map(tenant => ({
+        ...tenant,
+        latestPayment: latestPayments[tenant.id] || null
+      }));
+      
+      setTenants(tenantsWithPayments);
 
       // Fetch and generate units up to tenant limit
       await fetchUnits(limit);
@@ -82,13 +103,9 @@ export default function OccupancyGrid() {
       let allUnits = customUnits || [];
       const existingLabels = new Set(allUnits.map(u => u.label.toUpperCase()));
       
-      console.log('Custom units from DB:', allUnits.length);
-      console.log('Tenant limit:', limit);
-      
       // Generate additional units to reach the tenant limit
       if (allUnits.length < limit) {
         const unitsNeeded = limit - allUnits.length;
-        console.log('Generating', unitsNeeded, 'additional units');
         
         const floors = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
         let generatedCount = 0;
@@ -138,7 +155,6 @@ export default function OccupancyGrid() {
         return a.label.localeCompare(b.label);
       });
       
-      console.log('Total units (custom + auto):', allUnits.length);
       setUnits(allUnits);
       
     } catch (error) {
@@ -173,30 +189,30 @@ export default function OccupancyGrid() {
     setUnits(defaultUnits);
   }
 
-  const getTenantStatus = (tenant) => {
+  // ✅ UPDATED: Now accepts latestPayment parameter
+  const getTenantStatus = (tenant, latestPayment) => {
     if (!tenant) return { color: '#94a3b8', label: 'Vacant', bg: '#f1f5f9', textColor: '#94a3b8' };
     
     const today = new Date();
     const dueDate = tenant.due_date ? new Date(tenant.due_date) : null;
-    const status = tenant.status?.toLowerCase();
     
-    // GREEN - Paid/Active
-    if (status === 'paid') {
+    // Check payment status first
+    if (latestPayment?.status === 'Confirmed') {
       return { color: '#10b981', label: 'Paid', bg: '#d1fae5', textColor: '#059669' };
     }
-    if (status === 'active') {
-      return { color: '#10b981', label: 'Active', bg: '#d1fae5', textColor: '#059669' };
-    }
-    // RED - Overdue
+    
+    // Check if overdue (due date has passed)
     if (dueDate && dueDate < today) {
       return { color: '#ef4444', label: 'Overdue', bg: '#fee2e2', textColor: '#dc2626' };
     }
-    // AMBER - Pending
-    if (status === 'pending') {
+    
+    // Check if payment is pending
+    if (latestPayment?.status === 'Pending') {
       return { color: '#f59e0b', label: 'Pending', bg: '#fef3c7', textColor: '#d97706' };
     }
     
-    return { color: '#94a3b8', label: 'Vacant', bg: '#f1f5f9', textColor: '#94a3b8' };
+    // Default: Active but no payment record yet
+    return { color: '#f59e0b', label: 'Pending', bg: '#fef3c7', textColor: '#d97706' };
   };
 
   async function handleSaveUnit() {
@@ -210,8 +226,6 @@ export default function OccupancyGrid() {
       
       if (isTemporaryUnit) {
         // Create new unit in database
-        console.log('Creating new unit in database:', unitForm.label);
-        
         const newUnit = {
           id: crypto.randomUUID(),
           admin_id: userProfile.id,
@@ -229,16 +243,9 @@ export default function OccupancyGrid() {
           .insert(newUnit)
           .select();
         
-        if (error) {
-          console.error('Supabase insert error:', error);
-          throw error;
-        }
-        
-        console.log('Unit created successfully:', data);
+        if (error) throw error;
       } else {
         // Update existing unit in database
-        console.log('Updating existing unit:', editingUnit.id);
-        
         const { data, error } = await supabase
           .from('property_units')
           .update({
@@ -251,12 +258,7 @@ export default function OccupancyGrid() {
           .eq('admin_id', userProfile.id)
           .select();
         
-        if (error) {
-          console.error('Supabase update error:', error);
-          throw error;
-        }
-        
-        console.log('Unit updated successfully:', data);
+        if (error) throw error;
       }
 
       // Refresh units list with tenant limit
@@ -394,7 +396,7 @@ export default function OccupancyGrid() {
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12}}>
           <div>
             <h2 style={{margin: 0}}>🏢 Occupancy Grid</h2>
-            <p style={{margin: '4px 0 0 0', color: 'var(--gray)'}}>
+            <p style={{margin: '4px 0 0 0', color: 'var(--text-muted)'}}>
               {occupiedCount} occupied / {units.length} total units • {vacancyRate}% vacant
             </p>
           </div>
@@ -443,7 +445,8 @@ export default function OccupancyGrid() {
             return tenantHouse === unitLabel;
           });
           
-          const status = getTenantStatus(tenant);
+          // ✅ UPDATED: Pass latestPayment to getTenantStatus
+          const status = getTenantStatus(tenant, tenant?.latestPayment);
           
           return (
             <button
@@ -505,7 +508,7 @@ export default function OccupancyGrid() {
               <h3 style={{margin: '0 0 4px 0', fontSize: 18}}>
                 💬 Messages - Unit {selectedUnit.number}
               </h3>
-              <p style={{margin: 0, fontSize: 13, color: 'var(--gray)'}}>
+              <p style={{margin: 0, fontSize: 13, color: 'var(--text-muted)'}}>
                 {selectedUnit.tenant ? `Chat with ${selectedUnit.tenant.name}` : 'No tenant assigned'}
               </p>
             </div>
@@ -516,7 +519,7 @@ export default function OccupancyGrid() {
                 border: 'none',
                 fontSize: 20,
                 cursor: 'pointer',
-                color: 'var(--gray)',
+                color: 'var(--text-muted)',
                 padding: '4px 8px'
               }}
             >
@@ -529,7 +532,7 @@ export default function OccupancyGrid() {
               {/* Tenant Info Bar */}
               <div style={{
                 padding: 12,
-                background: '#f8fafc',
+                background: 'var(--bg-faint)',
                 borderRadius: 8,
                 marginBottom: 16,
                 display: 'flex',
@@ -549,12 +552,12 @@ export default function OccupancyGrid() {
                 overflowY: 'auto',
                 marginBottom: 16,
                 padding: 16,
-                background: '#ffffff',
-                border: '1px solid var(--border)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-primary)',
                 borderRadius: 8
               }}>
                 {messages.length === 0 ? (
-                  <div style={{textAlign: 'center', padding: 32, color: 'var(--gray)'}}>
+                  <div style={{textAlign: 'center', padding: 32, color: 'var(--text-muted)'}}>
                     <div style={{fontSize: 32, marginBottom: 8}}>💭</div>
                     <div>No messages yet. Start a conversation!</div>
                   </div>
@@ -571,8 +574,8 @@ export default function OccupancyGrid() {
                           maxWidth: '70%',
                           padding: '10px 14px',
                           borderRadius: 12,
-                          background: isFromAdmin ? '#3b82f6' : '#f1f5f9',
-                          color: isFromAdmin ? 'white' : '#1f2937'
+                          background: isFromAdmin ? '#3b82f6' : 'var(--bg-hover)',
+                          color: isFromAdmin ? 'white' : 'var(--text-primary)'
                         }}>
                           <div style={{fontSize: 11, opacity: 0.7, marginBottom: 4}}>
                             {msg.from_name} • {new Date(msg.date).toLocaleTimeString()}
@@ -598,8 +601,10 @@ export default function OccupancyGrid() {
                     flex: 1,
                     padding: '10px 14px',
                     borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    fontSize: 14
+                    border: '1px solid var(--border-primary)',
+                    fontSize: 14,
+                    background: 'var(--bg-input)',
+                    color: 'var(--text-primary)'
                   }}
                 />
                 <button 
@@ -616,7 +621,7 @@ export default function OccupancyGrid() {
               </div>
             </>
           ) : (
-            <div style={{textAlign: 'center', padding: 32, color: 'var(--gray)'}}>
+            <div style={{textAlign: 'center', padding: 32, color: 'var(--text-muted)'}}>
               <div style={{fontSize: 32, marginBottom: 8}}>🏠</div>
               <p style={{margin: 0}}>Unit {selectedUnit.number} is currently vacant.</p>
               <p style={{margin: '8px 0 0 0', fontSize: 13}}>
@@ -647,7 +652,7 @@ export default function OccupancyGrid() {
             width: '100%',
             maxHeight: '90vh',
             overflow: 'auto',
-            background: 'white'
+            background: 'var(--bg-card)'
           }}>
             <div style={{
               marginBottom: 20,
@@ -667,7 +672,7 @@ export default function OccupancyGrid() {
                   border: 'none',
                   fontSize: 24,
                   cursor: 'pointer',
-                  color: 'var(--gray)'
+                  color: 'var(--text-muted)'
                 }}
               >
                 ✕
@@ -677,7 +682,7 @@ export default function OccupancyGrid() {
             {/* Add/Edit Unit Form */}
             <div style={{
               padding: 16,
-              background: '#f8fafc',
+              background: 'var(--bg-faint)',
               borderRadius: 8,
               marginBottom: 20
             }}>
@@ -698,8 +703,10 @@ export default function OccupancyGrid() {
                       width: '100%',
                       padding: '8px 12px',
                       borderRadius: 6,
-                      border: '1px solid var(--border)',
-                      fontSize: 14
+                      border: '1px solid var(--border-primary)',
+                      fontSize: 14,
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-primary)'
                     }}
                   />
                 </div>
@@ -716,8 +723,10 @@ export default function OccupancyGrid() {
                       width: '100%',
                       padding: '8px 12px',
                       borderRadius: 6,
-                      border: '1px solid var(--border)',
-                      fontSize: 14
+                      border: '1px solid var(--border-primary)',
+                      fontSize: 14,
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-primary)'
                     }}
                   />
                 </div>
@@ -735,8 +744,10 @@ export default function OccupancyGrid() {
                     width: '100%',
                     padding: '8px 12px',
                     borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    fontSize: 14
+                    border: '1px solid var(--border-primary)',
+                    fontSize: 14,
+                    background: 'var(--bg-input)',
+                    color: 'var(--text-primary)'
                   }}
                 />
               </div>
@@ -780,9 +791,9 @@ export default function OccupancyGrid() {
                   return (
                     <div key={unit.id} style={{
                       padding: 12,
-                      background: tenant ? '#d1fae5' : '#f8fafc',
+                      background: tenant ? 'var(--success-bg)' : 'var(--bg-faint)',
                       borderRadius: 6,
-                      border: `1px solid ${tenant ? '#10b981' : 'var(--border)'}`,
+                      border: `1px solid ${tenant ? 'var(--success)' : 'var(--border-primary)'}`,
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center'
@@ -790,15 +801,15 @@ export default function OccupancyGrid() {
                       <div>
                         <div style={{fontWeight: 600}}>{unit.label}</div>
                         {unit.floor && (
-                          <div style={{fontSize: 12, color: 'var(--gray)'}}>{unit.floor}</div>
+                          <div style={{fontSize: 12, color: 'var(--text-muted)'}}>{unit.floor}</div>
                         )}
                         {tenant && (
-                          <div style={{fontSize: 11, color: '#059669', marginTop: 2, fontWeight: 600}}>
+                          <div style={{fontSize: 11, color: 'var(--success-dark)', marginTop: 2, fontWeight: 600}}>
                             ✓ {tenant.name.split(' ')[0]}
                           </div>
                         )}
                         {unit.isTemporary && (
-                          <div style={{fontSize: 10, color: '#94a3b8', marginTop: 2}}>
+                          <div style={{fontSize: 10, color: 'var(--text-muted)', marginTop: 2}}>
                             Auto-generated
                           </div>
                         )}
@@ -844,10 +855,10 @@ export default function OccupancyGrid() {
             <div style={{
               marginTop: 20,
               padding: 12,
-              background: '#eff6ff',
+              background: 'var(--info-bg)',
               borderRadius: 6,
               fontSize: 13,
-              color: '#1e40af'
+              color: 'var(--info)'
             }}>
               <strong>💡 Tip:</strong> Your tenant limit is {tenantLimit} units (set by Supreme Admin). 
               Auto-generated units fill up to this limit. Edit any unit to customize it.

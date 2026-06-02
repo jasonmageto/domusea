@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import './styles/global.css';
+import { supabase } from './supabaseClient';
 
 // ==========================================
 // COMPONENT IMPORTS - SUPREME ADMIN
@@ -41,38 +42,263 @@ import TenantSettings from './components/TenantSettings';
 import LoginScreen from './components/LoginScreen';
 
 // ==========================================
-// SUBSCRIPTION EXPIRED COMPONENT
+// SUBSCRIPTION EXPIRED COMPONENT (FIXED LOGOUT)
 // ==========================================
-const SubscriptionExpired = ({ userProfile, logout }) => (
-  <div className="frozen-container">
-    <div className="frozen-card animate-fadeIn">
-      <span className="frozen-icon">🔒</span>
-      <h1 className="frozen-title">Subscription Overdue</h1>
-      <p className="frozen-text">
-        Your account has been frozen due to an overdue subscription.
-      </p>
-      <div className="frozen-contact">
-        <strong>Account Details</strong>
-        <span>{userProfile?.name || 'N/A'}</span>
-        <span>KSh {userProfile?.subscription_fee?.toLocaleString() || '0'} Due</span>
-      </div>
-      <div className="frozen-buttons">
-        <button
-          onClick={() => window.location.href = 'tel:0711333436'}
-          className="btn btn-primary btn-full"
-        >
-          📞 Call Support to Renew
-        </button>
-        <button onClick={logout} className="btn btn-secondary btn-full">
-          Logout
-        </button>
+const SubscriptionExpired = ({ userProfile, logout }) => {
+  const [paying, setPaying] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState('idle');
+  const [paymentError, setPaymentError] = useState(null);
+
+  // Poll for payment confirmation
+  useEffect(() => {
+    if (paymentStatus === 'processing' && userProfile?.id) {
+      const checkInterval = setInterval(async () => {
+        try {
+          const { data: adminData, error } = await supabase
+            .from('admins')
+            .select('subscription_status')
+            .eq('id', userProfile.id)
+            .single();
+
+          if (error) throw error;
+
+          if (adminData?.subscription_status === 'Active') {
+            clearInterval(checkInterval);
+            setPaymentStatus('success');
+            
+            localStorage.removeItem('domusea-user');
+            localStorage.removeItem('domusea-token');
+            localStorage.removeItem('domusea-session-ts');
+            
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+          }
+        } catch (err) {
+          console.error('Error checking payment status:', err);
+        }
+      }, 3000);
+
+      return () => clearInterval(checkInterval);
+    }
+  }, [paymentStatus, userProfile?.id]);
+
+  const handlePayment = async () => {
+    setPaying(true);
+    setPaymentStatus('processing');
+    setPaymentError(null);
+    
+    try {
+      const { data: paymentRecord, error: insertError } = await supabase
+        .from('admin_to_sa_payments')
+        .insert({
+          admin_id: userProfile.id,
+          amount: userProfile.subscription_fee || 2500,
+          status: 'Pending',
+          payment_method: 'M-Pesa',
+          date: new Date().toISOString(),
+          description: `Subscription renewal - ${userProfile.subscription_plan || 'Monthly'}`
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      alert(`STK Push sent to your phone!\n\nAmount: KSh ${userProfile.subscription_fee?.toLocaleString() || '2,500'}\n\nPlease complete the payment on your phone.`);
+      
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      setPaymentStatus('error');
+      setPaymentError(error.message);
+      alert('Failed to initiate payment. Please try again or contact support.');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  // ✅ FIXED: Nuclear option logout that guarantees redirect
+  const handleLogout = () => {
+    console.log('🚪 Force logout initiated');
+    
+    // Clear ALL storage immediately
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Delete all cookies
+    document.cookie.split(";").forEach(function(c) { 
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
+    
+    // Force redirect
+    console.log('🔄 Redirecting to login...');
+    window.location.replace('/');
+    
+    // Fallback redirect
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 500);
+  };
+
+  return (
+    <div className="frozen-container">
+      <div className="frozen-card animate-fadeIn" style={{ maxWidth: '520px' }}>
+        <span className="frozen-icon">🔒</span>
+        <h1 className="frozen-title">Subscription Overdue</h1>
+        <p className="frozen-text">
+          Your account has been frozen due to an overdue subscription.
+        </p>
+        
+        <div className="frozen-contact" style={{ textAlign: 'left' }}>
+          <strong style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Account Details</strong>
+          <div style={{ padding: '12px', background: 'var(--bg-faint)', borderRadius: '6px' }}>
+            <div style={{ marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '2px' }}>Name</div>
+              <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{userProfile?.name || 'N/A'}</div>
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '2px' }}>Email</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{userProfile?.email || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '2px' }}>Amount Due</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--danger)' }}>
+                KSh {userProfile?.subscription_fee?.toLocaleString() || '0'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {paymentStatus === 'success' && (
+          <div style={{
+            padding: '16px',
+            background: 'var(--success-bg)',
+            border: '2px solid var(--success)',
+            borderRadius: '12px',
+            marginBottom: '16px',
+            color: 'var(--success-dark)',
+            textAlign: 'center',
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            <div style={{ fontSize: '24px', marginBottom: '8px' }}>✅</div>
+            <div style={{ fontWeight: '600', marginBottom: '4px' }}>Payment Detected!</div>
+            <div style={{ fontSize: '13px' }}>Redirecting to dashboard...</div>
+          </div>
+        )}
+
+        {paymentStatus === 'error' && (
+          <div style={{
+            padding: '16px',
+            background: 'var(--danger-bg)',
+            border: '2px solid var(--danger)',
+            borderRadius: '12px',
+            marginBottom: '16px',
+            color: 'var(--danger-dark)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '24px', marginBottom: '8px' }}>❌</div>
+            <div style={{ fontWeight: '600', marginBottom: '4px' }}>Payment Failed</div>
+            <div style={{ fontSize: '13px' }}>{paymentError || 'Please try again'}</div>
+          </div>
+        )}
+
+        <div className="frozen-buttons" style={{ gap: '12px' }}>
+          <button
+            onClick={handlePayment}
+            disabled={paying || paymentStatus === 'success'}
+            className="btn btn-primary btn-full"
+            style={{
+              padding: '14px 20px',
+              fontSize: '15px',
+              opacity: paying || paymentStatus === 'success' ? 0.7 : 1,
+              cursor: paying || paymentStatus === 'success' ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {paying ? (
+              <>
+                <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>
+                Processing...
+              </>
+            ) : paymentStatus === 'success' ? (
+              <>
+                <i className="fas fa-check" style={{ marginRight: '8px' }}></i>
+                Payment Received
+              </>
+            ) : (
+              <>
+                <i className="fas fa-credit-card" style={{ marginRight: '8px' }}></i>
+                Pay Subscription Now
+              </>
+            )}
+          </button>
+          
+          <button
+            onClick={() => window.location.href = 'tel:0711333436'}
+            className="btn btn-secondary btn-full"
+            disabled={paymentStatus === 'processing'}
+            style={{ padding: '12px 20px' }}
+          >
+            <i className="fas fa-phone" style={{ marginRight: '8px' }}></i>
+            Call Support
+          </button>
+          
+          <button 
+            onClick={handleLogout}
+            className="btn btn-ghost btn-full"
+            disabled={paymentStatus === 'processing'}
+            style={{ 
+              padding: '12px 20px',
+              cursor: paymentStatus === 'processing' ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <i className="fas fa-sign-out-alt" style={{ marginRight: '8px' }}></i>
+            Logout
+          </button>
+        </div>
+
+        {paymentStatus === 'processing' && (
+          <div style={{
+            marginTop: '20px',
+            padding: '16px',
+            background: 'var(--bg-faint)',
+            borderRadius: '8px',
+            textAlign: 'center',
+            border: '1px dashed var(--border-primary)'
+          }}>
+            <div style={{ fontSize: '28px', marginBottom: '8px' }}>⏳</div>
+            <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>
+              Waiting for Payment...
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              Please complete the payment on your phone.<br/>
+              We'll automatically redirect you once confirmed.
+            </div>
+            <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
+              <i className="fas fa-clock" style={{ marginRight: '6px' }}></i>
+              Checking every 3 seconds...
+            </div>
+          </div>
+        )}
+
+        <div style={{
+          marginTop: '20px',
+          padding: '12px',
+          background: 'var(--info-bg)',
+          borderRadius: '8px',
+          fontSize: '12px',
+          color: 'var(--info)',
+          textAlign: 'center',
+          border: '1px solid var(--info)'
+        }}>
+          <i className="fas fa-info-circle" style={{ marginRight: '6px' }}></i>
+          After payment, your account will be reactivated automatically within 30 seconds.
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ==========================================
-// UPDATE PROMPT COMPONENT (New)
+// UPDATE PROMPT COMPONENT
 // ==========================================
 const UpdatePrompt = ({ onRefresh }) => (
   <div className="fixed bottom-4 right-4 z-[1200] animate-fadeIn">
@@ -104,7 +330,6 @@ function AppContent() {
   const [isDark, setIsDark] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
-  // ✅ Initialize theme from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem('domusea-theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -118,16 +343,13 @@ function AppContent() {
     }
   }, []);
 
-  // ✅ Apply theme changes
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     localStorage.setItem('domusea-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  // ✅ Toggle theme
   const toggleTheme = () => setIsDark(prev => !prev);
 
-  // ✅ Close mobile menu on resize
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 768) {
@@ -138,21 +360,17 @@ function AppContent() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ✅ Reset active tab when role changes
   useEffect(() => {
     setActiveTab('dashboard');
   }, [userProfile?.role]);
 
-  // ✅ Service Worker Update Detection (New)
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      // Listen for new SW activation
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         console.log('🔄 New service worker activated');
         setUpdateAvailable(true);
       });
 
-      // Check for waiting SW on mount
       navigator.serviceWorker.getRegistration().then((registration) => {
         if (registration?.waiting) {
           console.log('⏳ Waiting service worker found');
@@ -161,11 +379,9 @@ function AppContent() {
       });
     }
 
-    // ✅ Listen for visibility change to auto-refresh auth
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && userProfile) {
         // Optional: refresh auth when tab becomes visible
-        // refreshAuth();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -175,10 +391,8 @@ function AppContent() {
     };
   }, [userProfile]);
 
-  // ✅ Handle update refresh
   const handleUpdateRefresh = () => {
     setUpdateAvailable(false);
-    // Force reload to activate new service worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then((reg) => {
         if (reg?.waiting) {
@@ -189,12 +403,10 @@ function AppContent() {
     window.location.reload();
   };
 
-  // ✅ Handle auth errors with auto-recovery
   useEffect(() => {
     if (error && !loading) {
       console.warn('⚠️ Auth error detected:', error);
       
-      // Auto-recover on specific errors
       if (error.includes('expired') || error.includes('invalid')) {
         console.log('🔄 Attempting auth recovery...');
         refreshAuth();
@@ -202,9 +414,6 @@ function AppContent() {
     }
   }, [error, loading, refreshAuth]);
 
-  // ==========================================
-  // LOADING STATE
-  // ==========================================
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -217,27 +426,17 @@ function AppContent() {
     );
   }
 
-  // ==========================================
-  // NOT AUTHENTICATED
-  // ==========================================
   if (!userProfile) {
     return <LoginScreen isDark={isDark} toggleTheme={toggleTheme} error={error} />;
   }
 
-  // ==========================================
-  // SUBSCRIPTION EXPIRED (Admin Only)
-  // ==========================================
   if (userProfile.role === 'admin' && userProfile.subscription_status === 'Overdue') {
     return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
   }
 
-  // ==========================================
-  // ROLE-BASED MENU CONFIGURATION
-  // ==========================================
   const getMenuItems = () => {
     const role = userProfile.role;
     
-    // Supreme Admin
     if (role === 'supreme_admin') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
@@ -252,7 +451,6 @@ function AppContent() {
       ];
     }
     
-    // Property Admin
     if (role === 'admin') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
@@ -267,7 +465,6 @@ function AppContent() {
       ];
     }
     
-    // Tenant
     if (role === 'tenant') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
@@ -282,17 +479,11 @@ function AppContent() {
     return [];
   };
 
-  // ==========================================
-  // ROLE-BASED COMPONENT RENDERING (STRICT)
-  // ==========================================
   const renderContent = () => {
     const role = userProfile.role;
     
     console.log('🎯 [APP] Rendering for role:', role, '| Tab:', activeTab);
     
-    // ==========================================
-    // SUPREME ADMIN ROUTING (EXCLUSIVE)
-    // ==========================================
     if (role === 'supreme_admin') {
       console.log('✅ Routing to Supreme Admin Dashboard');
       switch (activeTab) {
@@ -309,9 +500,6 @@ function AppContent() {
       }
     }
     
-    // ==========================================
-    // PROPERTY ADMIN ROUTING (EXCLUSIVE)
-    // ==========================================
     if (role === 'admin') {
       console.log('✅ Routing to Property Admin Dashboard');
       switch (activeTab) {
@@ -328,9 +516,6 @@ function AppContent() {
       }
     }
     
-    // ==========================================
-    // TENANT ROUTING (EXCLUSIVE)
-    // ==========================================
     if (role === 'tenant') {
       console.log('✅ Routing to Tenant Dashboard');
       switch (activeTab) {
@@ -344,9 +529,6 @@ function AppContent() {
       }
     }
     
-    // ==========================================
-    // FALLBACK - UNKNOWN ROLE
-    // ==========================================
     console.error('❌ [APP] Unknown role:', role);
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -373,15 +555,11 @@ function AppContent() {
     );
   };
 
-  // ==========================================
-  // RENDER APP
-  // ==========================================
   const menuItems = getMenuItems();
   const userRole = userProfile.role?.replace('_', ' ') || 'Unknown';
 
   return (
     <div className={`app-wrapper ${isDark ? 'dark' : ''}`}>
-      {/* Skip to content for accessibility */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-white px-4 py-2 rounded-lg z-50"
@@ -389,12 +567,8 @@ function AppContent() {
         Skip to main content
       </a>
 
-      {/* ========================================== */}
-      {/* NAVIGATION BAR                               */}
-      {/* ========================================== */}
       <nav className="navbar" role="navigation" aria-label="Main navigation">
         <div className="nav-container">
-          {/* Brand */}
           <a
             href="#"
             className="brand"
@@ -408,7 +582,6 @@ function AppContent() {
             <span>DomusEA</span>
           </a>
 
-          {/* Navigation Menu */}
           <ul
             className={`nav-menu ${isMobileMenuOpen ? 'active' : ''}`}
             id="navMenu"
@@ -434,9 +607,7 @@ function AppContent() {
             ))}
           </ul>
 
-          {/* Right Actions */}
           <div className="nav-actions">
-            {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
               className="theme-toggle"
@@ -447,7 +618,6 @@ function AppContent() {
               <span className="hide-mobile">{isDark ? 'Light' : 'Dark'}</span>
             </button>
 
-            {/* User Info */}
             <div
               className="user-info"
               title={`${userProfile?.name} • ${userRole}`}
@@ -464,7 +634,6 @@ function AppContent() {
               </div>
             </div>
 
-            {/* Logout */}
             <button
               onClick={logout}
               className="btn btn-danger btn-sm"
@@ -475,7 +644,6 @@ function AppContent() {
               <span className="hide-mobile">Logout</span>
             </button>
 
-            {/* Mobile Menu Toggle */}
             <button
               className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -491,16 +659,10 @@ function AppContent() {
         </div>
       </nav>
 
-      {/* ========================================== */}
-      {/* MAIN CONTENT                                 */}
-      {/* ========================================== */}
       <main id="main-content" className="main-content" role="main">
         {renderContent()}
       </main>
 
-      {/* ========================================== */}
-      {/* FOOTER                                       */}
-      {/* ========================================== */}
       <footer className="footer" role="contentinfo">
         <div className="footer-content">
           <div className="footer-links">
@@ -535,7 +697,6 @@ function AppContent() {
         </div>
       </footer>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
           className="mobile-overlay"
@@ -544,7 +705,6 @@ function AppContent() {
         />
       )}
 
-      {/* ✅ Update Prompt (New) */}
       {updateAvailable && <UpdatePrompt onRefresh={handleUpdateRefresh} />}
     </div>
   );
