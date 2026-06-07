@@ -42,7 +42,7 @@ import TenantSettings from './components/TenantSettings';
 import LoginScreen from './components/LoginScreen';
 
 // ==========================================
-// SUBSCRIPTION EXPIRED COMPONENT (FIXED LOGOUT)
+// SUBSCRIPTION EXPIRED COMPONENT
 // ==========================================
 const SubscriptionExpired = ({ userProfile, logout }) => {
   const [paying, setPaying] = useState(false);
@@ -116,24 +116,15 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
     }
   };
 
-  // ✅ FIXED: Nuclear option logout that guarantees redirect
   const handleLogout = () => {
     console.log('🚪 Force logout initiated');
-    
-    // Clear ALL storage immediately
     localStorage.clear();
     sessionStorage.clear();
-    
-    // Delete all cookies
     document.cookie.split(";").forEach(function(c) { 
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
     });
-    
-    // Force redirect
     console.log('🔄 Redirecting to login...');
     window.location.replace('/');
-    
-    // Fallback redirect
     setTimeout(() => {
       window.location.href = '/';
     }, 500);
@@ -298,27 +289,66 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
 };
 
 // ==========================================
-// UPDATE PROMPT COMPONENT
+// UPDATE PROMPT COMPONENT (Fixed)
 // ==========================================
-const UpdatePrompt = ({ onRefresh }) => (
-  <div className="fixed bottom-4 right-4 z-[1200] animate-fadeIn">
-    <div className="card p-4 shadow-lg border border-primary">
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-2xl">🔄</span>
-        <div>
-          <h4 className="font-semibold text-primary">Update Available</h4>
-          <p className="text-sm text-muted">A new version is ready</p>
+const UpdatePrompt = ({ onRefresh }) => {
+  const [updating, setUpdating] = useState(false);
+
+  const handleRefresh = async () => {
+    setUpdating(true);
+    try {
+      await onRefresh();
+    } catch (error) {
+      console.error('Update error:', error);
+      setUpdating(false);
+    }
+  };
+
+  const handleDismiss = () => {
+    localStorage.setItem('domusea-update-dismissed', 'true');
+    const prompt = document.querySelector('.update-prompt-wrapper');
+    if (prompt) prompt.style.display = 'none';
+  };
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[1200] animate-fadeIn update-prompt-wrapper">
+      <div className="card p-4 shadow-lg border border-primary" style={{ maxWidth: 320 }}>
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-2xl">🔄</span>
+          <div>
+            <h4 className="font-semibold text-primary">Update Available</h4>
+            <p className="text-sm text-muted">A new version is ready</p>
+          </div>
         </div>
+        <button
+          onClick={handleRefresh}
+          disabled={updating}
+          className="btn btn-primary btn-sm w-full"
+          style={{ opacity: updating ? 0.7 : 1, cursor: updating ? 'not-allowed' : 'pointer' }}
+        >
+          {updating ? (
+            <>
+              <i className="fas fa-spinner fa-spin" style={{ marginRight: 8 }}></i>
+              Updating...
+            </>
+          ) : (
+            <>
+              <i className="fas fa-sync" style={{ marginRight: 8 }}></i>
+              Refresh Now
+            </>
+          )}
+        </button>
+        <button
+          onClick={handleDismiss}
+          className="btn btn-ghost btn-sm w-full mt-2"
+          style={{ fontSize: 12 }}
+        >
+          Remind me later
+        </button>
       </div>
-      <button
-        onClick={onRefresh}
-        className="btn btn-primary btn-sm w-full"
-      >
-        Refresh Now
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 // ==========================================
 // MAIN APP CONTENT
@@ -365,6 +395,10 @@ function AppContent() {
   }, [userProfile?.role]);
 
   useEffect(() => {
+    if (localStorage.getItem('domusea-update-dismissed') === 'true') {
+      return;
+    }
+    
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         console.log('🔄 New service worker activated');
@@ -391,16 +425,39 @@ function AppContent() {
     };
   }, [userProfile]);
 
-  const handleUpdateRefresh = () => {
+  const handleUpdateRefresh = async () => {
+    console.log('🔄 Starting update process...');
     setUpdateAvailable(false);
+    
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistration().then((reg) => {
-        if (reg?.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(key => caches.delete(key)));
         }
-      });
+        
+        const registration = await navigator.serviceWorker.getRegistration();
+        
+        if (registration?.waiting) {
+          console.log('⏳ Found waiting service worker');
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          
+          const timeout = new Promise(resolve => setTimeout(resolve, 5000));
+          const activated = new Promise(resolve => {
+            registration.waiting?.addEventListener('statechange', (e) => {
+              if (e.target.state === 'activated') resolve();
+            });
+          });
+          
+          await Promise.race([activated, timeout]);
+        }
+      } catch (error) {
+        console.error('❌ Service worker update error:', error);
+      }
     }
-    window.location.reload();
+    
+    console.log('🔄 Force reloading...');
+    window.location.href = window.location.href;
   };
 
   useEffect(() => {

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
+import { toast } from 'react-hot-toast';
 
 export default function TenantDashboard() {
   const { userProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [rentInfo, setRentInfo] = useState(null);
+  const [adminInfo, setAdminInfo] = useState(null);
 
   useEffect(() => {
     if (userProfile?.id) {
@@ -17,6 +19,7 @@ export default function TenantDashboard() {
   async function fetchData() {
     try {
       setLoading(true);
+      console.log('🔍 Fetching data for tenant:', userProfile.id);
       
       // Fetch tenant details with admin info
       const { data: tenantData, error: tenantError } = await supabase
@@ -24,6 +27,7 @@ export default function TenantDashboard() {
         .select(`
           *,
           admins (
+            id,
             name,
             email,
             phone
@@ -32,8 +36,18 @@ export default function TenantDashboard() {
         .eq('id', userProfile.id)
         .single();
 
-      if (tenantError) throw tenantError;
+      if (tenantError) {
+        console.error('❌ Tenant fetch error:', tenantError);
+        toast.error('Failed to load tenant data');
+        throw tenantError;
+      }
+      
+      console.log('✅ Tenant data loaded:', tenantData);
+      console.log('✅ Linked Admin ID:', tenantData.admin_id);
+      console.log('✅ Admin Details:', tenantData.admins);
+      
       setRentInfo(tenantData);
+      setAdminInfo(tenantData.admins);
 
       // Fetch admin's payment methods
       const { data: methodsData, error: methodsError } = await supabase
@@ -44,11 +58,24 @@ export default function TenantDashboard() {
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (methodsError) throw methodsError;
+      if (methodsError) {
+        console.error('❌ Payment methods error:', methodsError);
+        throw methodsError;
+      }
+      
+      console.log('✅ Payment methods found:', methodsData?.length || 0);
+      console.log('📋 Methods:', methodsData);
+      
       setPaymentMethods(methodsData || []);
       
+      if (!methodsData || methodsData.length === 0) {
+        console.warn('⚠️ No active payment methods found for admin:', tenantData.admin_id);
+        toast('No payment methods configured yet', { icon: '⏳' });
+      }
+      
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('❌ Error in fetchData:', error);
+      toast.error('Failed to load dashboard');
     } finally {
       setLoading(false);
     }
@@ -69,6 +96,21 @@ export default function TenantDashboard() {
     return icons[type] || '💳';
   };
 
+  const getMethodLabel = (type) => {
+    const labels = {
+      mpesa_personal: 'M-Pesa (Personal)',
+      mpesa_till: 'M-Pesa (Buy Goods)',
+      mpesa_paybill: 'M-Pesa (Paybill)',
+      airtel_money: 'Airtel Money',
+      t_kash: 'T-Kash',
+      bank_account: 'Bank Account',
+      sasa_pay: 'SasaPay',
+      pesapal: 'Pesapal',
+      cash: 'Cash'
+    };
+    return labels[type] || type;
+  };
+
   if (loading) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: 40 }}>
@@ -86,6 +128,11 @@ export default function TenantDashboard() {
         <p style={{ margin: 0, color: 'var(--text-muted)' }}>
           Unit: {rentInfo?.house || 'N/A'} | Property: {rentInfo?.property || 'N/A'}
         </p>
+        {adminInfo && (
+          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+            Property Admin: <strong>{adminInfo.name}</strong>
+          </p>
+        )}
       </div>
 
       {/* Rent Summary */}
@@ -98,7 +145,9 @@ export default function TenantDashboard() {
             </div>
             <div className="stat-icon blue">💰</div>
           </div>
-          <div className="stat-subtitle">Due date: {rentInfo?.due_date ? new Date(rentInfo.due_date).toLocaleDateString() : 'N/A'}</div>
+          <div className="stat-subtitle">
+            Due: {rentInfo?.due_date ? new Date(rentInfo.due_date).toLocaleDateString() : 'N/A'}
+          </div>
         </div>
         
         <div className="stat-card">
@@ -120,15 +169,26 @@ export default function TenantDashboard() {
         <div className="card-header">
           <h3 style={{ margin: 0, fontSize: 18 }}>💳 How to Pay Rent</h3>
           <span className="badge badge-muted">
-            {paymentMethods.length} method{paymentMethods.length !== 1 ? 's' : ''} available
+            {paymentMethods.length} method{paymentMethods.length !== 1 ? 's' : ''}
           </span>
         </div>
         <div className="card-body">
           {paymentMethods.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-              <p>Payment methods are being configured by your property admin.</p>
-              <p style={{ fontSize: 13, marginTop: 8 }}>Please check back later or contact your admin.</p>
+              <p style={{ margin: '0 0 8px 0' }}>Payment methods are being configured.</p>
+              <p style={{ fontSize: 13, margin: 0 }}>
+                Please contact {adminInfo?.name || 'your admin'} for payment details.
+              </p>
+              {adminInfo?.phone && (
+                <a 
+                  href={`tel:${adminInfo.phone}`}
+                  className="btn btn-primary"
+                  style={{ marginTop: 16 }}
+                >
+                  📞 Call {adminInfo.name}
+                </a>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: 16 }}>
@@ -154,29 +214,35 @@ export default function TenantDashboard() {
                     <div>
                       <h4 style={{ margin: 0, fontSize: 16 }}>{method.method_name}</h4>
                       <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        {method.method_type.replace('_', ' ').toUpperCase()}
+                        {getMethodLabel(method.method_type)}
                       </span>
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
                     {method.phone_number && (
-                      <div style={{ marginBottom: 4 }}>
-                        <strong>📱 Phone:</strong> {method.phone_number}
+                      <div style={{ marginBottom: 6 }}>
+                        <strong>📱 Phone:</strong>{' '}
+                        <a href={`tel:${method.phone_number}`} style={{ color: 'var(--primary)' }}>
+                          {method.phone_number}
+                        </a>
                       </div>
                     )}
                     {method.account_number && (
-                      <div style={{ marginBottom: 4 }}>
-                        <strong>🔢 Account/Till:</strong> {method.account_number}
+                      <div style={{ marginBottom: 6 }}>
+                        <strong>🔢 {method.method_type.includes('mpesa') ? 'Till/Paybill' : 'Account'}:</strong>{' '}
+                        <span style={{ fontFamily: 'monospace', background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: 4 }}>
+                          {method.account_number}
+                        </span>
                       </div>
                     )}
                     {method.account_name && (
-                      <div style={{ marginBottom: 4 }}>
+                      <div style={{ marginBottom: 6 }}>
                         <strong>👤 Account Name:</strong> {method.account_name}
                       </div>
                     )}
                     {method.bank_name && (
-                      <div style={{ marginBottom: 4 }}>
+                      <div style={{ marginBottom: 6 }}>
                         <strong>🏦 Bank:</strong> {method.bank_name}{method.branch ? ` - ${method.branch}` : ''}
                       </div>
                     )}
@@ -184,12 +250,13 @@ export default function TenantDashboard() {
                       <div style={{ 
                         marginTop: 12, 
                         padding: 12, 
-                        background: 'var(--bg-white)',
+                        background: 'var(--bg-card)',
                         borderRadius: 8,
                         fontSize: 13,
-                        fontStyle: 'italic'
+                        border: '1px dashed var(--border-primary)'
                       }}>
-                        <strong>💡 Instructions:</strong> {method.instructions}
+                        <strong>💡 Instructions:</strong>
+                        <p style={{ margin: '4px 0 0 0', fontStyle: 'italic' }}>{method.instructions}</p>
                       </div>
                     )}
                   </div>
@@ -225,6 +292,17 @@ export default function TenantDashboard() {
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Maintenance & more</p>
           </div>
         </a>
+      </div>
+
+      {/* Debug Button (Remove in production) */}
+      <div style={{ marginTop: 24, textAlign: 'center' }}>
+        <button 
+          onClick={fetchData}
+          className="btn btn-sm btn-ghost"
+          style={{ fontSize: 11 }}
+        >
+          🔄 Refresh Data
+        </button>
       </div>
     </div>
   );
