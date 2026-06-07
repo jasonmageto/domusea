@@ -1,212 +1,224 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
+import { toast } from 'react-hot-toast';
 
 export default function TenantPayRent() {
   const { userProfile } = useAuth();
-  const [tenant, setTenant] = useState(null);
-  const [methods, setMethods] = useState([]);
-  const [selectedMethodId, setSelectedMethodId] = useState('');
-  const [reference, setReference] = useState('');
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [paymentSuccess, setPaymentSuccess] = useState(null);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [formData, setFormData] = useState({
+    amount: '',
+    payment_method: '',
+    mpesa_code: '',
+    reference: '',
+    notes: ''
+  });
 
   useEffect(() => {
-    if (userProfile && userProfile.email) {
-      fetchTenantProfile();
+    if (userProfile?.id) {
+      fetchPaymentMethods();
     }
-  }, [userProfile]);
+  }, [userProfile?.id]);
 
-  async function fetchTenantProfile() {
+  async function fetchPaymentMethods() {
     try {
-      const tenantResult = await supabase
+      setLoading(true);
+      // Get tenant's admin ID
+      const { data: tenantData } = await supabase
         .from('tenants')
-        .select('*')
-        .eq('email', userProfile.email)
+        .select('admin_id')
+        .eq('id', userProfile.id)
         .single();
 
-      const tData = tenantResult.data;
-      if (tData) {
-        setTenant(tData);
-        const methodsResult = await supabase
-          .from('admin_payment_methods')
-          .select('*')
-          .eq('admin_id', tData.admin_id)
-          .eq('active', true);
-        setMethods(methodsResult.data || []);
-      }
-    } catch (err) {
-      console.error('Error:', err);
+      if (!tenantData) throw new Error('Tenant record not found');
+
+      // Fetch admin's payment methods
+      const { data: methodsData } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('admin_id', tenantData.admin_id)
+        .eq('is_active', true)
+        .order('is_default', { ascending: false });
+
+      setPaymentMethods(methodsData || []);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to load payment methods');
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function copyCodeToClipboard() {
-    if (paymentSuccess) {
-      navigator.clipboard.writeText(paymentSuccess.reference);
-      setMsg('✅ Code copied to clipboard!');
-      setTimeout(() => setMsg(''), 3000);
-    }
-  }
-
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedMethodId || !reference.trim()) {
-      setMsg('❌ Please select a method and enter the Transaction Code.');
+    
+    if (!formData.amount || !formData.payment_method) {
+      toast.error('Please fill in all required fields');
       return;
     }
-    if (!tenant) return;
 
     setSubmitting(true);
-    setMsg('');
-    setPaymentSuccess(null);
-
     try {
-      const selectedMethod = methods.find(m => m.id === selectedMethodId);
-      
-      const insertResult = await supabase.from('payments').insert({
-        tenant_id: tenant.id,
-        admin_id: tenant.admin_id,
-        amount: tenant.rent,
-        method: selectedMethod.type,
-        reference: reference.trim(),
-        status: 'Pending'
-      });
+      // Record payment (pending verification by admin)
+      const { error } = await supabase
+        .from('payments')
+        .insert({
+          tenant_id: userProfile.id,
+          admin_id: (await supabase.from('tenants').select('admin_id').eq('id', userProfile.id).single()).data.admin_id,
+          amount: parseFloat(formData.amount),
+          payment_method: formData.payment_method,
+          mpesa_code: formData.mpesa_code,
+          reference: formData.reference,
+          status: 'Pending',
+          date: new Date().toISOString(),
+          notes: formData.notes
+        });
 
-      if (insertResult.error) throw insertResult.error;
-
-      // Show success screen with code
-      setPaymentSuccess({
-        amount: tenant.rent,
-        reference: reference.trim(),
-        method: selectedMethod.type
-      });
-      setReference('');
-      setSelectedMethodId('');
+      if (error) throw error;
       
-    } catch (err) {
-      setMsg(`❌ ${err.message}`);
+      toast.success('Payment recorded! Waiting for admin confirmation.');
+      setFormData({
+        amount: '',
+        payment_method: '',
+        mpesa_code: '',
+        reference: '',
+        notes: ''
+      });
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to record payment');
     } finally {
       setSubmitting(false);
     }
-  }
+  };
 
-  if (!tenant) return <div className="card" style={{textAlign:'center', padding:40}}>Loading...</div>;
-
-  // Success Screen
-  if (paymentSuccess) {
+  if (loading) {
     return (
-      <div>
-        <div className="card" style={{textAlign: 'center', border: '2px solid var(--green)'}}>
-          <h2 style={{color: 'var(--green)'}}>✅ Payment Submitted!</h2>
-          <p style={{marginBottom: 16}}>Your payment of <strong>KSh {paymentSuccess.amount}</strong> is pending confirmation.</p>
-          
-          <div style={{background: 'var(--bg)', padding: 16, borderRadius: 8, marginBottom: 16, display: 'inline-block'}}>
-            <p style={{margin: 0, fontSize: 14, color: 'var(--gray)'}}>Transaction Code</p>
-            <p style={{margin: '4px 0 0', fontSize: 24, fontWeight: 'bold', fontFamily: 'monospace', letterSpacing: 2}}>
-              {paymentSuccess.reference}
-            </p>
-          </div>
-
-          <div style={{display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20}}>
-            <button className="btn btn-primary" onClick={copyCodeToClipboard}>
-              📋 Copy Code
-            </button>
-            <button className="btn" onClick={() => setPaymentSuccess(null)}>
-              Back
-            </button>
-          </div>
-          
-          <p style={{marginTop: 16, fontSize: 13, color: 'var(--gray)'}}>
-            ⚠️ Please send this code to your Landlord/Admin to confirm your payment.
-          </p>
-          {msg && <p style={{color: 'var(--green)', fontWeight: 'bold', marginTop: 8}}>{msg}</p>}
-        </div>
+      <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <div>Loading...</div>
       </div>
     );
   }
 
-  const daysLeft = Math.ceil((new Date(tenant.due_date) - new Date()) / 86400000);
-  const isUrgent = daysLeft <= 3 || daysLeft < 0;
-  const themeColor = tenant.status === 'good' ? 'var(--green)' : tenant.status === 'pending' ? 'var(--amber)' : 'var(--red)';
-
   return (
     <div>
-      <h2 style={{marginBottom: 24}}>Pay Rent</h2>
+      <h2 style={{ marginBottom: 24 }}>💳 Pay Rent</h2>
 
-      {isUrgent && (
-        <div className="card" style={{marginBottom: 16, background: 'rgba(239,68,68,0.1)', borderLeft: '4px solid var(--red)'}}>
-          <p style={{margin:0, fontWeight:600, color:'var(--red)'}}>
-            ⚠️ {daysLeft < 0 ? `Rent is OVERDUE by ${Math.abs(daysLeft)} days!` : `Rent is DUE in ${daysLeft} day(s).`}
-          </p>
+      {/* Payment Instructions */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <h3 style={{ margin: 0 }}>Available Payment Methods</h3>
         </div>
-      )}
-
-      <div className="card" style={{marginBottom: 24, borderLeft: `4px solid ${themeColor}`}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-          <div>
-            <h3 style={{margin:'0 0 4px 0'}}>Amount Due</h3>
-            <p style={{margin:0, color:'var(--gray)'}}>Due: {new Date(tenant.due_date).toLocaleDateString()}</p>
-          </div>
-          <div style={{textAlign:'right'}}>
-            <p style={{margin:0, fontSize:32, fontWeight:700, color: themeColor}}>KSh {tenant.rent}</p>
-            <p style={{margin:0, fontSize:12, color:'var(--gray)'}}>
-              {daysLeft < 0 ? `Overdue by ${Math.abs(daysLeft)} days` : `${daysLeft} days remaining`}
+        <div className="card-body">
+          {paymentMethods.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+              No payment methods configured. Contact your admin.
             </p>
-          </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {paymentMethods.map(method => (
+                <div key={method.id} style={{ 
+                  padding: 12, 
+                  background: 'var(--bg-faint)', 
+                  borderRadius: 8,
+                  border: method.is_default ? '2px solid var(--primary)' : '1px solid var(--border-primary)'
+                }}>
+                  <strong>{method.method_name}</strong>
+                  {method.phone_number && <div>📱 {method.phone_number}</div>}
+                  {method.account_number && <div>🔢 {method.account_number}</div>}
+                  {method.instructions && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>💡 {method.instructions}</div>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Payment Form */}
       <div className="card">
-        <h3 style={{marginTop:0}}>Submit Payment</h3>
-        <p style={{fontSize: 13, color: 'var(--gray)', marginBottom: 16}}>
-          Enter the <strong>Transaction Code</strong> you received from M-Pesa/Bank to complete this payment.
-        </p>
-        {methods.length === 0 ? (
-          <p>No active payment methods available.</p>
-        ) : (
+        <div className="card-header">
+          <h3 style={{ margin: 0 }}>Record Your Payment</h3>
+        </div>
+        <div className="card-body">
           <form onSubmit={handleSubmit}>
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12}}>
-              <select value={selectedMethodId} onChange={e=>setSelectedMethodId(e.target.value)} style={inputStyle} required>
-                <option value="">Choose method...</option>
-                {methods.map(m => <option key={m.id} value={m.id}>{m.type} ({m.holder || m.name})</option>)}
-              </select>
-              <input 
-                placeholder="Transaction Code (e.g. QKH3...)" 
-                value={reference} 
-                onChange={e=>setReference(e.target.value)} 
-                style={inputStyle} 
-                required 
-              />
-            </div>
-
-            {selectedMethodId && (
-              <div style={{background:'var(--bg)', padding:12, borderRadius:6, marginBottom:12, border:'1px solid var(--border)', fontSize:14}}>
-                {(() => {
-                  const m = methods.find(x => x.id === selectedMethodId);
-                  if (!m) return null;
-                  return (
-                    <div>
-                      {m.type === 'M-Pesa' && <p><strong>Send to:</strong> {m.number} (Name: {m.holder})</p>}
-                      {m.type === 'Paybill' && <p><strong>Paybill:</strong> {m.paybill_number} | <strong>Account:</strong> {m.account_number}</p>}
-                      {m.type === 'Bank Transfer' && <p><strong>Bank:</strong> {m.name} | <strong>Acc:</strong> {m.account_number}</p>}
-                      {m.type === 'Airtel Money' && <p><strong>Send to:</strong> {m.number}</p>}
-                      {m.details && m.type !== 'Cash' && <p style={{marginTop:4, color:'var(--gray)'}}>{m.details}</p>}
-                    </div>
-                  );
-                })()}
+            <div style={{ display: 'grid', gap: 16 }}>
+              <div>
+                <label className="form-label">Amount Paid *</label>
+                <input
+                  type="number"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                  placeholder="e.g., 7000"
+                  className="form-input"
+                  required
+                />
               </div>
-            )}
 
-            <button type="submit" className="btn btn-primary" disabled={submitting || methods.length === 0} style={{width:'100%', padding:'12px'}}>
-              {submitting ? 'Submitting...' : 'Submit Payment'}
-            </button>
+              <div>
+                <label className="form-label">Payment Method *</label>
+                <select
+                  value={formData.payment_method}
+                  onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
+                  className="form-select"
+                  required
+                >
+                  <option value="">Select method...</option>
+                  {paymentMethods.map(method => (
+                    <option key={method.id} value={method.method_name}>
+                      {method.method_name} {method.is_default ? '(Recommended)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">M-Pesa Code / Reference</label>
+                <input
+                  type="text"
+                  value={formData.mpesa_code}
+                  onChange={(e) => setFormData({...formData, mpesa_code: e.target.value})}
+                  placeholder="e.g., QKH123ABC"
+                  className="form-input"
+                />
+                <small style={{ color: 'var(--text-muted)' }}>Enter M-Pesa confirmation code if applicable</small>
+              </div>
+
+              <div>
+                <label className="form-label">Additional Reference</label>
+                <input
+                  type="text"
+                  value={formData.reference}
+                  onChange={(e) => setFormData({...formData, reference: e.target.value})}
+                  placeholder="e.g., House number, Your name"
+                  className="form-input"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Notes (Optional)</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  placeholder="Any additional information..."
+                  className="form-textarea"
+                  rows={3}
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn btn-primary btn-full"
+                disabled={submitting}
+              >
+                {submitting ? 'Submitting...' : '✅ Submit Payment'}
+              </button>
+            </div>
           </form>
-        )}
-        {msg && <p style={{marginTop:12, textAlign:'center', fontWeight:'bold', color: 'var(--red)'}}>{msg}</p>}
+        </div>
       </div>
     </div>
   );
 }
-
-const inputStyle = { padding:10, borderRadius:6, border:'1px solid var(--border)', width:'100%', background:'var(--bg)', color:'var(--text)' };
