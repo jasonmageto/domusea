@@ -49,7 +49,6 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
   const [paymentStatus, setPaymentStatus] = useState('idle');
   const [paymentError, setPaymentError] = useState(null);
 
-  // Poll for payment confirmation
   useEffect(() => {
     if (paymentStatus === 'processing' && userProfile?.id) {
       const checkInterval = setInterval(async () => {
@@ -65,14 +64,10 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
           if (adminData?.subscription_status === 'Active') {
             clearInterval(checkInterval);
             setPaymentStatus('success');
-            
             localStorage.removeItem('domusea-user');
             localStorage.removeItem('domusea-token');
             localStorage.removeItem('domusea-session-ts');
-            
-            setTimeout(() => {
-              window.location.reload();
-            }, 2000);
+            setTimeout(() => window.location.reload(), 2000);
           }
         } catch (err) {
           console.error('Error checking payment status:', err);
@@ -87,9 +82,8 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
     setPaying(true);
     setPaymentStatus('processing');
     setPaymentError(null);
-    
     try {
-      const { data: paymentRecord, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('admin_to_sa_payments')
         .insert({
           admin_id: userProfile.id,
@@ -103,9 +97,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
         .single();
 
       if (insertError) throw insertError;
-
       alert(`STK Push sent to your phone!\n\nAmount: KSh ${userProfile.subscription_fee?.toLocaleString() || '2,500'}\n\nPlease complete the payment on your phone.`);
-      
     } catch (error) {
       console.error('Payment initiation error:', error);
       setPaymentStatus('error');
@@ -123,11 +115,8 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
     document.cookie.split(";").forEach(function(c) { 
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
     });
-    console.log('🔄 Redirecting to login...');
     window.location.replace('/');
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 500);
+    setTimeout(() => { window.location.href = '/'; }, 500);
   };
 
   return (
@@ -135,9 +124,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
       <div className="frozen-card animate-fadeIn" style={{ maxWidth: '520px' }}>
         <span className="frozen-icon">🔒</span>
         <h1 className="frozen-title">Subscription Overdue</h1>
-        <p className="frozen-text">
-          Your account has been frozen due to an overdue subscription.
-        </p>
+        <p className="frozen-text">Your account has been frozen due to an overdue subscription.</p>
         
         <div className="frozen-contact" style={{ textAlign: 'left' }}>
           <strong style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Account Details</strong>
@@ -160,16 +147,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
         </div>
 
         {paymentStatus === 'success' && (
-          <div style={{
-            padding: '16px',
-            background: 'var(--success-bg)',
-            border: '2px solid var(--success)',
-            borderRadius: '12px',
-            marginBottom: '16px',
-            color: 'var(--success-dark)',
-            textAlign: 'center',
-            animation: 'fadeIn 0.3s ease'
-          }}>
+          <div style={{ padding: '16px', background: 'var(--success-bg)', border: '2px solid var(--success)', borderRadius: '12px', marginBottom: '16px', color: 'var(--success-dark)', textAlign: 'center', animation: 'fadeIn 0.3s ease' }}>
             <div style={{ fontSize: '24px', marginBottom: '8px' }}>✅</div>
             <div style={{ fontWeight: '600', marginBottom: '4px' }}>Payment Detected!</div>
             <div style={{ fontSize: '13px' }}>Redirecting to dashboard...</div>
@@ -177,15 +155,7 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
         )}
 
         {paymentStatus === 'error' && (
-          <div style={{
-            padding: '16px',
-            background: 'var(--danger-bg)',
-            border: '2px solid var(--danger)',
-            borderRadius: '12px',
-            marginBottom: '16px',
-            color: 'var(--danger-dark)',
-            textAlign: 'center'
-          }}>
+          <div style={{ padding: '16px', background: 'var(--danger-bg)', border: '2px solid var(--danger)', borderRadius: '12px', marginBottom: '16px', color: 'var(--danger-dark)', textAlign: 'center' }}>
             <div style={{ fontSize: '24px', marginBottom: '8px' }}>❌</div>
             <div style={{ fontWeight: '600', marginBottom: '4px' }}>Payment Failed</div>
             <div style={{ fontSize: '13px' }}>{paymentError || 'Please try again'}</div>
@@ -193,93 +163,37 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
         )}
 
         <div className="frozen-buttons" style={{ gap: '12px' }}>
-          <button
-            onClick={handlePayment}
-            disabled={paying || paymentStatus === 'success'}
-            className="btn btn-primary btn-full"
-            style={{
-              padding: '14px 20px',
-              fontSize: '15px',
-              opacity: paying || paymentStatus === 'success' ? 0.7 : 1,
-              cursor: paying || paymentStatus === 'success' ? 'not-allowed' : 'pointer'
-            }}
-          >
+          <button onClick={handlePayment} disabled={paying || paymentStatus === 'success'} className="btn btn-primary btn-full" style={{ padding: '14px 20px', fontSize: '15px', opacity: paying || paymentStatus === 'success' ? 0.7 : 1, cursor: paying || paymentStatus === 'success' ? 'not-allowed' : 'pointer' }}>
             {paying ? (
-              <>
-                <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>
-                Processing...
-              </>
+              <><i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>Processing...</>
             ) : paymentStatus === 'success' ? (
-              <>
-                <i className="fas fa-check" style={{ marginRight: '8px' }}></i>
-                Payment Received
-              </>
+              <><i className="fas fa-check" style={{ marginRight: '8px' }}></i>Payment Received</>
             ) : (
-              <>
-                <i className="fas fa-credit-card" style={{ marginRight: '8px' }}></i>
-                Pay Subscription Now
-              </>
+              <><i className="fas fa-credit-card" style={{ marginRight: '8px' }}></i>Pay Subscription Now</>
             )}
           </button>
           
-          <button
-            onClick={() => window.location.href = 'tel:0711333436'}
-            className="btn btn-secondary btn-full"
-            disabled={paymentStatus === 'processing'}
-            style={{ padding: '12px 20px' }}
-          >
-            <i className="fas fa-phone" style={{ marginRight: '8px' }}></i>
-            Call Support
+          <button onClick={() => window.location.href = 'tel:0711333436'} className="btn btn-secondary btn-full" disabled={paymentStatus === 'processing'} style={{ padding: '12px 20px' }}>
+            <i className="fas fa-phone" style={{ marginRight: '8px' }}></i>Call Support
           </button>
           
-          <button 
-            onClick={handleLogout}
-            className="btn btn-ghost btn-full"
-            disabled={paymentStatus === 'processing'}
-            style={{ 
-              padding: '12px 20px',
-              cursor: paymentStatus === 'processing' ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <i className="fas fa-sign-out-alt" style={{ marginRight: '8px' }}></i>
-            Logout
+          <button onClick={handleLogout} className="btn btn-ghost btn-full" disabled={paymentStatus === 'processing'} style={{ padding: '12px 20px', cursor: paymentStatus === 'processing' ? 'not-allowed' : 'pointer' }}>
+            <i className="fas fa-sign-out-alt" style={{ marginRight: '8px' }}></i>Logout
           </button>
         </div>
 
         {paymentStatus === 'processing' && (
-          <div style={{
-            marginTop: '20px',
-            padding: '16px',
-            background: 'var(--bg-faint)',
-            borderRadius: '8px',
-            textAlign: 'center',
-            border: '1px dashed var(--border-primary)'
-          }}>
+          <div style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-faint)', borderRadius: '8px', textAlign: 'center', border: '1px dashed var(--border-primary)' }}>
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>⏳</div>
-            <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>
-              Waiting for Payment...
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              Please complete the payment on your phone.<br/>
-              We'll automatically redirect you once confirmed.
-            </div>
+            <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>Waiting for Payment...</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Please complete the payment on your phone.<br/>We'll automatically redirect you once confirmed.</div>
             <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
-              <i className="fas fa-clock" style={{ marginRight: '6px' }}></i>
-              Checking every 3 seconds...
+              <i className="fas fa-clock" style={{ marginRight: '6px' }}></i>Checking every 3 seconds...
             </div>
           </div>
         )}
 
-        <div style={{
-          marginTop: '20px',
-          padding: '12px',
-          background: 'var(--info-bg)',
-          borderRadius: '8px',
-          fontSize: '12px',
-          color: 'var(--info)',
-          textAlign: 'center',
-          border: '1px solid var(--info)'
-        }}>
+        <div style={{ marginTop: '20px', padding: '12px', background: 'var(--info-bg)', borderRadius: '8px', fontSize: '12px', color: 'var(--info)', textAlign: 'center', border: '1px solid var(--info)' }}>
           <i className="fas fa-info-circle" style={{ marginRight: '6px' }}></i>
           After payment, your account will be reactivated automatically within 30 seconds.
         </div>
@@ -289,19 +203,14 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
 };
 
 // ==========================================
-// UPDATE PROMPT COMPONENT (Fixed)
+// UPDATE PROMPT COMPONENT
 // ==========================================
 const UpdatePrompt = ({ onRefresh }) => {
   const [updating, setUpdating] = useState(false);
 
   const handleRefresh = async () => {
     setUpdating(true);
-    try {
-      await onRefresh();
-    } catch (error) {
-      console.error('Update error:', error);
-      setUpdating(false);
-    }
+    try { await onRefresh(); } catch (error) { console.error('Update error:', error); setUpdating(false); }
   };
 
   const handleDismiss = () => {
@@ -314,41 +223,62 @@ const UpdatePrompt = ({ onRefresh }) => {
     <div className="fixed bottom-4 right-4 z-[1200] animate-fadeIn update-prompt-wrapper">
       <div className="card p-4 shadow-lg border border-primary" style={{ maxWidth: 320 }}>
         <div className="flex items-center gap-3 mb-3">
-          <span className="text-2xl">🔄</span>
+          <span className="text-2xl"></span>
           <div>
             <h4 className="font-semibold text-primary">Update Available</h4>
             <p className="text-sm text-muted">A new version is ready</p>
           </div>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={updating}
-          className="btn btn-primary btn-sm w-full"
-          style={{ opacity: updating ? 0.7 : 1, cursor: updating ? 'not-allowed' : 'pointer' }}
-        >
+        <button onClick={handleRefresh} disabled={updating} className="btn btn-primary btn-sm w-full" style={{ opacity: updating ? 0.7 : 1, cursor: updating ? 'not-allowed' : 'pointer' }}>
           {updating ? (
-            <>
-              <i className="fas fa-spinner fa-spin" style={{ marginRight: 8 }}></i>
-              Updating...
-            </>
+            <><i className="fas fa-spinner fa-spin" style={{ marginRight: 8 }}></i>Updating...</>
           ) : (
-            <>
-              <i className="fas fa-sync" style={{ marginRight: 8 }}></i>
-              Refresh Now
-            </>
+            <><i className="fas fa-sync" style={{ marginRight: 8 }}></i>Refresh Now</>
           )}
         </button>
-        <button
-          onClick={handleDismiss}
-          className="btn btn-ghost btn-sm w-full mt-2"
-          style={{ fontSize: 12 }}
-        >
-          Remind me later
-        </button>
+        <button onClick={handleDismiss} className="btn btn-ghost btn-sm w-full mt-2" style={{ fontSize: 12 }}>Remind me later</button>
       </div>
     </div>
   );
 };
+
+// ==========================================
+// VIEW TOGGLE COMPONENT
+// ==========================================
+const ViewToggle = ({ isDesktopView, onToggle }) => (
+  <button
+    onClick={onToggle}
+    className="btn btn-sm"
+    style={{
+      background: 'var(--bg-faint)',
+      color: 'var(--text-secondary)',
+      border: '1px solid var(--border)',
+      borderRadius: '20px',
+      padding: '6px 12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '12px',
+      fontWeight: 600,
+      transition: 'all 0.2s',
+      whiteSpace: 'nowrap'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.background = 'var(--primary)';
+      e.currentTarget.style.color = '#fff';
+      e.currentTarget.style.borderColor = 'var(--primary)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.background = 'var(--bg-faint)';
+      e.currentTarget.style.color = 'var(--text-secondary)';
+      e.currentTarget.style.borderColor = 'var(--border)';
+    }}
+    title={isDesktopView ? 'Switch to Mobile View' : 'Switch to Desktop View'}
+  >
+    <i className={`fas ${isDesktopView ? 'fa-mobile-alt' : 'fa-desktop'}`}></i>
+    <span className="hide-mobile">{isDesktopView ? 'Mobile' : 'Desktop'}</span>
+  </button>
+);
 
 // ==========================================
 // MAIN APP CONTENT
@@ -359,6 +289,12 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  
+  // ✅ New: Desktop View State
+  const [isDesktopView, setIsDesktopView] = useState(() => {
+    const saved = localStorage.getItem('domusea-view-mode');
+    return saved === 'desktop';
+  });
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('domusea-theme');
@@ -377,6 +313,22 @@ function AppContent() {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     localStorage.setItem('domusea-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
+
+  // ✅ Toggle View Mode
+  const toggleViewMode = () => {
+    const newMode = !isDesktopView;
+    setIsDesktopView(newMode);
+    localStorage.setItem('domusea-view-mode', newMode ? 'desktop' : 'auto');
+    
+    // Force body to have desktop styles when in desktop mode
+    if (newMode) {
+      document.body.style.minWidth = '1024px';
+      document.body.style.overflowX = 'auto';
+    } else {
+      document.body.style.minWidth = '';
+      document.body.style.overflowX = '';
+    }
+  };
 
   const toggleTheme = () => setIsDark(prev => !prev);
 
@@ -462,7 +414,7 @@ function AppContent() {
 
   useEffect(() => {
     if (error && !loading) {
-      console.warn('⚠️ Auth error detected:', error);
+      console.warn('️ Auth error detected:', error);
       
       if (error.includes('expired') || error.includes('invalid')) {
         console.log('🔄 Attempting auth recovery...');
@@ -590,7 +542,7 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="card p-8 text-center max-w-md">
-          <div className="text-5xl mb-4">⚠️</div>
+          <div className="text-5xl mb-4">️</div>
           <h2 className="text-xl font-bold text-danger mb-2">Unknown Role</h2>
           <p className="text-muted mb-6">
             Your role <code className="px-2 py-1 bg-faint rounded text-sm">"{role}"</code> is not recognized.
@@ -600,10 +552,7 @@ function AppContent() {
             <button onClick={logout} className="btn btn-primary flex-1">
               <i className="fas fa-sign-out-alt"></i> Logout
             </button>
-            <button
-              onClick={() => window.location.href = 'tel:0711333436'}
-              className="btn btn-secondary flex-1"
-            >
+            <button onClick={() => window.location.href = 'tel:0711333436'} className="btn btn-secondary flex-1">
               <i className="fas fa-phone"></i> Call Support
             </button>
           </div>
@@ -616,7 +565,7 @@ function AppContent() {
   const userRole = userProfile.role?.replace('_', ' ') || 'Unknown';
 
   return (
-    <div className={`app-wrapper ${isDark ? 'dark' : ''}`}>
+    <div className={`app-wrapper ${isDark ? 'dark' : ''} ${isDesktopView ? 'force-desktop-view' : ''}`}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-white px-4 py-2 rounded-lg z-50"
@@ -665,6 +614,9 @@ function AppContent() {
           </ul>
 
           <div className="nav-actions">
+            {/* ✅ View Toggle Button */}
+            <ViewToggle isDesktopView={isDesktopView} onToggle={toggleViewMode} />
+
             <button
               onClick={toggleTheme}
               className="theme-toggle"

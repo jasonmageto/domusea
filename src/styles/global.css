@@ -1189,3 +1189,172 @@ tbody tr:last-child td { border-bottom: none; }
   color: var(--primary) !important;
   text-decoration: underline;
 }
+
+/* ==========================================
+   ✅ VIEW TOGGLE STYLES (NEW)
+   Enable switching between Mobile/Desktop views
+   ========================================== */
+
+/* Force Desktop View Mode - overrides responsive breakpoints */
+.force-desktop-view {
+  min-width: 1024px !important;
+}
+
+.force-desktop-view body {
+  min-width: 1024px !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* View Toggle Button - matches your theme */
+.view-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-faint);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+}
+
+.view-toggle-btn:hover {
+  background: var(--primary);
+  color: var(--text-inverse);
+  border-color: var(--primary);
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.15);
+}
+
+.view-toggle-btn:active {
+  transform: translateY(1px);
+}
+
+.view-toggle-btn i {
+  font-size: 14px;
+  width: 14px;
+  text-align: center;
+}
+
+/* Desktop View: Show full nav, hide hamburger */
+@media (max-width: 1024px) {
+  .force-desktop-view .nav-menu {
+    position: static !important;
+    display: flex !important;
+    flex-direction: row !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    gap: 0.125rem !important;
+  }
+  
+  .force-desktop-view .nav-menu a {
+    width: auto !important;
+    padding: 0.625rem 1rem !important;
+    font-size: 0.875rem !important;
+    border-radius: var(--radius) !important;
+    justify-content: center !important;
+  }
+  
+  .force-desktop-view .hamburger {
+    display: none !important;
+  }
+  
+  .force-desktop-view .hide-mobile {
+    display: inline !important;
+  }
+  
+  .force-desktop-view .mobile-overlay {
+    display: none !important;
+  }
+  
+  .force-desktop-view .user-details {
+    display: flex !important;
+  }
+  
+  .force-desktop-view .theme-toggle span {
+    display: inline !important;
+  }
+}
+
+/* Desktop View: Ensure content scrolls horizontally on mobile */
+.force-desktop-view .main-content {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--container-padding);
+}
+
+/* Desktop View: Tables maintain full width */
+.force-desktop-view table {
+  min-width: 800px;
+}
+
+.force-desktop-view .table-container {
+  overflow-x: visible;
+}
+
+/* Desktop View: Stats grid maintains layout */
+@media (max-width: 768px) {
+  .force-desktop-view .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+  }
+  
+  .force-desktop-view .content-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* Visual indicator for desktop mode (optional - can be removed) */
+.force-desktop-view::after {
+  content: '';
+  display: none; /* Enable for debugging: display: block; */
+}
+
+/* Smooth transition when toggling view */
+.app-wrapper {
+  transition: min-width 0.3s ease;
+}
+
+/* Ensure navbar actions wrap nicely on small screens */
+@media (max-width: 480px) {
+  .nav-actions {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  
+  .view-toggle-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  
+  .view-toggle-btn .hide-mobile {
+    display: none;
+  }
+}
+
+/* Dark mode adjustments for view toggle */
+[data-theme="dark"] .view-toggle-btn {
+  background: var(--bg-faint);
+  border-color: var(--border-primary);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .view-toggle-btn:hover {
+  background: var(--primary);
+  color: var(--text-inverse);
+  border-color: var(--primary);
+}
