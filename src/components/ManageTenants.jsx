@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { exportToPDF } from '../utils/pdfExport';
+import { toast, Toaster } from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const DEFAULT_TENANT_PASSWORD = 'tenant123';
 
@@ -60,12 +62,27 @@ export default function ManageTenants() {
       setFilteredTenants(data || []);
     } catch (error) {
       console.error('Error fetching tenants:', error);
+      toast.error('Failed to load tenants');
     } finally {
       setLoading(false);
     }
   }
 
   const downloadCSV = () => {
+    if (filteredTenants.length === 0) {
+      toast('No tenants to export', {
+        icon: '📭',
+        duration: 3000,
+        style: {
+          background: '#F59E0B',
+          color: '#fff',
+          padding: '14px 20px',
+          borderRadius: '12px'
+        }
+      });
+      return;
+    }
+
     const headers = ['Name', 'Email', 'Phone', 'Property', 'Unit', 'Rent', 'Due Date', 'Status'];
     const rows = filteredTenants.map(t => [
       t.name, t.email, t.phone || 'N/A', t.property || 'N/A', 
@@ -77,28 +94,152 @@ export default function ManageTenants() {
     link.href = URL.createObjectURL(blob);
     link.download = `tenants_list_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+    
+    toast.success('✅ CSV downloaded!', {
+      duration: 3000,
+      style: {
+        background: '#10B981',
+        color: '#fff',
+        padding: '14px 20px',
+        borderRadius: '12px'
+      }
+    });
   };
 
+  // ✅ FIXED: Beautiful PDF Export with jsPDF
   const downloadPDF = () => {
-    const headers = ['Name', 'Property', 'Unit', 'Rent', 'Due Date', 'Status'];
-    const data = filteredTenants.map(t => [
-      t.name, t.property || 'N/A', t.house || 'N/A', 
-      `KSh ${parseFloat(t.rent).toLocaleString()}`,
-      t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A',
-      t.status
-    ]);
-    exportToPDF({
-      title: 'Tenants List Report',
-      filename: 'Tenants_List',
-      headers,
-      data,
-      subtitle: `Total Tenants: ${filteredTenants.length}`
+    if (filteredTenants.length === 0) {
+      toast('No tenants to export', {
+        icon: '📭',
+        duration: 3000,
+        style: {
+          background: '#F59E0B',
+          color: '#fff',
+          padding: '14px 20px',
+          borderRadius: '12px'
+        }
+      });
+      return;
+    }
+
+    const loadingToast = toast.loading('📄 Generating PDF...', {
+      style: {
+        background: '#3B82F6',
+        color: '#fff',
+        padding: '14px 20px',
+        borderRadius: '12px'
+      }
     });
+
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFontSize(18);
+        doc.setTextColor(79, 70, 229);
+        doc.text('🏢 DomusEA - Tenant List', 14, 20);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Generated: ${new Date().toLocaleString('en-KE')}`, 14, 28);
+        doc.text(`Property Admin: ${userProfile.name}`, 14, 33);
+        doc.text(`Total Tenants: ${filteredTenants.length}`, 14, 38);
+        
+        // Table data
+        const tableData = filteredTenants.map(t => [
+          t.name || 'Unknown',
+          t.property || 'N/A',
+          t.house || 'N/A',
+          `KSh ${parseFloat(t.rent || 0).toLocaleString()}`,
+          t.due_date ? new Date(t.due_date).toLocaleDateString('en-KE') : 'N/A',
+          t.status || 'Unknown'
+        ]);
+
+        // Generate table
+        autoTable(doc, {
+          startY: 45,
+          head: [['Name', 'Property', 'Unit', 'Rent', 'Due Date', 'Status']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: {
+            fillColor: [79, 70, 229],
+            textColor: 255,
+            fontStyle: 'bold',
+            fontSize: 9
+          },
+          styles: {
+            fontSize: 8,
+            cellPadding: 3,
+            overflow: 'linebreak'
+          },
+          columnStyles: {
+            0: { cellWidth: 35 },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 20 },
+            3: { cellWidth: 25 },
+            4: { cellWidth: 25 },
+            5: { cellWidth: 25 }
+          }
+        });
+
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.setFontSize(8);
+          doc.setTextColor(150);
+          doc.text(`Page ${i} of ${pageCount}`, 14, doc.internal.pageSize.height - 10);
+          doc.text('© DomusEA - Confidential', doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 10);
+        }
+
+        // Save file
+        doc.save(`Tenants_${new Date().toISOString().split('T')[0]}.pdf`);
+        
+        toast.success('✅ Tenant list downloaded!', {
+          duration: 4000,
+          style: {
+            background: '#10B981',
+            color: '#fff',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            fontWeight: '600'
+          }
+        });
+        
+      } catch (err) {
+        console.error('PDF export error:', err);
+        toast.error('❌ Failed to generate PDF. Please try again.', {
+          duration: 5000,
+          style: {
+            background: '#EF4444',
+            color: '#fff',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            fontWeight: '600'
+          }
+        });
+      } finally {
+        toast.dismiss(loadingToast);
+      }
+    }, 300);
   };
 
   const handleBulkReminders = async () => {
     if (!window.confirm('Send rent reminders to all pending and overdue tenants?')) return;
     setSendingBulkReminders(true);
+    
+    const loadingToast = toast.loading('📧 Sending reminders...', {
+      style: {
+        background: '#3B82F6',
+        color: '#fff',
+        padding: '14px 20px',
+        borderRadius: '12px'
+      }
+    });
+    
     try {
       const today = new Date();
       const targets = tenants.filter(t => {
@@ -109,7 +250,16 @@ export default function ManageTenants() {
       });
 
       if (targets.length === 0) {
-        alert('No tenants require reminders.');
+        toast('No tenants require reminders', {
+          icon: '✅',
+          duration: 3000,
+          style: {
+            background: '#10B981',
+            color: '#fff',
+            padding: '14px 20px',
+            borderRadius: '12px'
+          }
+        });
         return;
       }
 
@@ -127,11 +277,34 @@ export default function ManageTenants() {
 
       const { error } = await supabase.from('messages').insert(reminders);
       if (error) throw error;
-      alert(`✅ Reminders sent to ${targets.length} tenants`);
+      
+      toast.success(`✅ Reminders sent to ${targets.length} tenants!`, {
+        duration: 4000,
+        style: {
+          background: '#10B981',
+          color: '#fff',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontWeight: '600'
+        }
+      });
     } catch (error) {
-      alert('Failed to send reminders.');
+      console.error('Error sending reminders:', error);
+      toast.error('❌ Failed to send reminders', {
+        duration: 5000,
+        style: {
+          background: '#EF4444',
+          color: '#fff',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontWeight: '600'
+        }
+      });
     } finally {
       setSendingBulkReminders(false);
+      toast.dismiss(loadingToast);
     }
   };
 
@@ -144,6 +317,16 @@ export default function ManageTenants() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setCreating(true);
+    
+    const loadingToast = toast.loading(editingTenant ? '💾 Updating...' : '✨ Creating tenant...', {
+      style: {
+        background: '#3B82F6',
+        color: '#fff',
+        padding: '14px 20px',
+        borderRadius: '12px'
+      }
+    });
+    
     try {
       if (editingTenant) {
         const { error } = await supabase.from('tenants').update({
@@ -152,7 +335,17 @@ export default function ManageTenants() {
           due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null, status: formData.status
         }).eq('id', editingTenant.id);
         if (error) throw error;
-        alert('✅ Updated!');
+        toast.success('✅ Tenant updated!', {
+          duration: 4000,
+          style: {
+            background: '#10B981',
+            color: '#fff',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            fontWeight: '600'
+          }
+        });
       } else {
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email, password: DEFAULT_TENANT_PASSWORD,
@@ -166,21 +359,92 @@ export default function ManageTenants() {
           status: formData.status
         });
         if (dbError) throw dbError;
-        alert('✅ Created!');
+        
+        // Show credentials modal
+        setNewTenantCredentials({ email: formData.email, password: DEFAULT_TENANT_PASSWORD });
+        setShowPasswordModal(true);
+        
+        toast.success('✅ Tenant created!', {
+          duration: 4000,
+          style: {
+            background: '#10B981',
+            color: '#fff',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            fontWeight: '600'
+          }
+        });
       }
       setShowModal(false);
       fetchTenants();
     } catch (error) {
-      alert(`❌ Error: ${error.message}`);
+      console.error('Error saving tenant:', error);
+      toast.error(`❌ ${error.message}`, {
+        duration: 5000,
+        style: {
+          background: '#EF4444',
+          color: '#fff',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontWeight: '600'
+        }
+      });
     } finally {
       setCreating(false);
+      toast.dismiss(loadingToast);
     }
   };
 
-  if (loading) return <div style={{textAlign: 'center', padding: 40}}>Loading tenants...</div>;
+  if (loading) {
+    return (
+      <div style={{textAlign: 'center', padding: 40}}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <div>Loading tenants...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
+      {/* ✅ Toast Notifications */}
+      <Toaster 
+        position="top-right"
+        gutter={12}
+        containerStyle={{ margin: '8px' }}
+        toastOptions={{
+          success: { 
+            duration: 4000,
+            style: {
+              background: '#10B981',
+              color: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontWeight: '600'
+            }
+          },
+          error: { 
+            duration: 5000,
+            style: {
+              background: '#EF4444',
+              color: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontWeight: '600'
+            }
+          },
+          loading: {
+            duration: 3000,
+            style: {
+              background: '#3B82F6',
+              color: '#fff',
+              borderRadius: '12px'
+            }
+          }
+        }}
+      />
+
       <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12}}>
         <h2 style={{margin: 0}}>👥 Manage Tenants</h2>
         <div style={{display: 'flex', gap: 12}}>
@@ -250,6 +514,31 @@ export default function ManageTenants() {
                 <button type="submit" className="btn btn-primary">{creating ? 'Saving...' : 'Save Tenant'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Password Modal for New Tenants */}
+      {showPasswordModal && newTenantCredentials && (
+        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001}}>
+          <div className="card" style={{width: '100%', maxWidth: 400, padding: 24}}>
+            <h3 style={{margin: '0 0 16px 0'}}>🎉 Tenant Created!</h3>
+            <p style={{margin: '0 0 16px 0', color: 'var(--text-muted)'}}>
+              Share these credentials with the new tenant:
+            </p>
+            <div style={{background: 'var(--bg-faint)', padding: 16, borderRadius: 8, marginBottom: 16}}>
+              <div style={{marginBottom: 8}}><strong>Email:</strong> {newTenantCredentials.email}</div>
+              <div><strong>Password:</strong> {newTenantCredentials.password}</div>
+            </div>
+            <button 
+              onClick={() => {
+                setShowPasswordModal(false);
+                setNewTenantCredentials(null);
+              }}
+              className="btn btn-primary btn-full"
+            >
+              Got it!
+            </button>
           </div>
         </div>
       )}

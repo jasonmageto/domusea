@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { exportPaymentsToPDF, exportAdminsToPDF } from '../utils/pdfExport';
+import { toast, Toaster } from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function SADashboard() {
   const { userProfile } = useAuth();
@@ -64,7 +66,7 @@ export default function SADashboard() {
 
       if (paymentsError) throw paymentsError;
 
-      // ✅ Calculate stats - FIXED: Case-insensitive status filter
+      // ✅ Calculate stats - Case-insensitive status filter
       const now = new Date();
       const confirmedPayments = paymentsData?.filter(p => 
         p.status?.toLowerCase() === 'confirmed'
@@ -79,7 +81,7 @@ export default function SADashboard() {
 
       const totalReceived = confirmedPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
       
-      // ✅ FIXED: Case-insensitive pending filter
+      // ✅ Case-insensitive pending filter
       const pendingPaymentsCount = paymentsData?.filter(p => 
         p.status?.toLowerCase() === 'pending'
       )?.length || 0;
@@ -101,28 +103,263 @@ export default function SADashboard() {
     } catch (err) {
       console.error('❌ Dashboard fetch error:', err);
       setError(err.message);
+      toast.error('Failed to load dashboard data');
     } finally {
-      // CRITICAL: Always stop loading
       setLoading(false);
     }
   }
 
-  // ✅ Download handlers
+  // ✅ Beautiful PDF Export for Payments
+  const exportPaymentsToPDF = (payments, filename) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(79, 70, 229); // Primary color
+      doc.text('🏢 DomusEA - Payment Report', 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Generated: ${new Date().toLocaleString('en-KE')}`, 14, 28);
+      doc.text(`Total Records: ${payments.length}`, 14, 33);
+      
+      // Table data
+      const tableData = payments.map(p => [
+        p.admins?.name || 'Unknown',
+        p.admins?.email || '',
+        `KSh ${parseFloat(p.amount || 0).toLocaleString()}`,
+        p.status || 'Pending',
+        new Date(p.date).toLocaleDateString('en-KE')
+      ]);
+
+      // Generate table
+      autoTable(doc, {
+        startY: 40,
+        head: [['Admin', 'Email', 'Amount', 'Status', 'Date']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [79, 70, 229],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 9
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          overflow: 'linebreak'
+        },
+        columnStyles: {
+          0: { cellWidth: 40 },
+          1: { cellWidth: 50 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 30 }
+        }
+      });
+
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Page ${i} of ${pageCount}`, 14, doc.internal.pageSize.height - 10);
+        doc.text('© DomusEA - Confidential', doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 10);
+      }
+
+      // Save file
+      doc.save(filename || 'payments-report.pdf');
+      
+      toast.success('✅ Payments report downloaded!', {
+        duration: 4000,
+        style: {
+          background: '#10B981',
+          color: '#fff',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontWeight: '600'
+        }
+      });
+      
+    } catch (err) {
+      console.error('PDF export error:', err);
+      toast.error('❌ Failed to generate PDF. Please try again.', {
+        duration: 5000,
+        style: {
+          background: '#EF4444',
+          color: '#fff',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontWeight: '600'
+        }
+      });
+    }
+  };
+
+  // ✅ Beautiful PDF Export for Admins
+  const exportAdminsToPDF = (admins, filename) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(79, 70, 229);
+      doc.text('🏢 DomusEA - Active Admins Report', 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Generated: ${new Date().toLocaleString('en-KE')}`, 14, 28);
+      doc.text(`Total Admins: ${admins.length}`, 14, 33);
+      
+      // Table data
+      const tableData = admins.map(a => [
+        a.name || 'Unknown',
+        a.email || '',
+        a.subscription_plan || 'Monthly',
+        `KSh ${parseFloat(a.subscription_fee || 0).toLocaleString()}`,
+        a.subscription_status || 'Unknown'
+      ]);
+
+      // Generate table
+      autoTable(doc, {
+        startY: 40,
+        head: [['Name', 'Email', 'Plan', 'Fee', 'Status']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [79, 70, 229],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 9
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          overflow: 'linebreak'
+        },
+        columnStyles: {
+          0: { cellWidth: 40 },
+          1: { cellWidth: 55 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 25 }
+        }
+      });
+
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Page ${i} of ${pageCount}`, 14, doc.internal.pageSize.height - 10);
+        doc.text('© DomusEA - Confidential', doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 10);
+      }
+
+      // Save file
+      doc.save(filename || 'admins-report.pdf');
+      
+      toast.success('✅ Admins report downloaded!', {
+        duration: 4000,
+        style: {
+          background: '#10B981',
+          color: '#fff',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontWeight: '600'
+        }
+      });
+      
+    } catch (err) {
+      console.error('PDF export error:', err);
+      toast.error('❌ Failed to generate PDF. Please try again.', {
+        duration: 5000,
+        style: {
+          background: '#EF4444',
+          color: '#fff',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontWeight: '600'
+        }
+      });
+    }
+  };
+
+  // ✅ Download handlers with loading states
   const handleDownloadPayments = () => {
-    exportPaymentsToPDF(
-      recentPayments, 
-      `payments_${new Date().toISOString().split('T')[0]}.pdf`
-    );
+    if (recentPayments.length === 0) {
+      toast('No payments to export', {
+        icon: '📭',
+        duration: 3000,
+        style: {
+          background: '#F59E0B',
+          color: '#fff',
+          padding: '14px 20px',
+          borderRadius: '12px'
+        }
+      });
+      return;
+    }
+    
+    const loadingToast = toast.loading('📄 Generating PDF...', {
+      style: {
+        background: '#3B82F6',
+        color: '#fff',
+        padding: '14px 20px',
+        borderRadius: '12px'
+      }
+    });
+    
+    setTimeout(() => {
+      exportPaymentsToPDF(
+        recentPayments, 
+        `DomusEA_Payments_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      toast.dismiss(loadingToast);
+    }, 300);
   };
 
   const handleDownloadAdmins = () => {
-    exportAdminsToPDF(
-      activeAdminsList, 
-      `admins_${new Date().toISOString().split('T')[0]}.pdf`
-    );
+    if (activeAdminsList.length === 0) {
+      toast('No admins to export', {
+        icon: '👥',
+        duration: 3000,
+        style: {
+          background: '#F59E0B',
+          color: '#fff',
+          padding: '14px 20px',
+          borderRadius: '12px'
+        }
+      });
+      return;
+    }
+    
+    const loadingToast = toast.loading('📄 Generating PDF...', {
+      style: {
+        background: '#3B82F6',
+        color: '#fff',
+        padding: '14px 20px',
+        borderRadius: '12px'
+      }
+    });
+    
+    setTimeout(() => {
+      exportAdminsToPDF(
+        activeAdminsList, 
+        `DomusEA_Admins_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      toast.dismiss(loadingToast);
+    }, 300);
   };
 
   const formatCurrency = (amount) => `KSh ${(parseFloat(amount) || 0).toLocaleString()}`;
+  
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-KE', {
@@ -151,6 +388,43 @@ export default function SADashboard() {
 
   return (
     <div className="animate-fadeIn">
+      {/* ✅ Toast Notifications Container */}
+      <Toaster 
+        position="top-right"
+        gutter={12}
+        containerStyle={{ margin: '8px' }}
+        toastOptions={{
+          success: { 
+            duration: 4000,
+            style: {
+              background: '#10B981',
+              color: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontWeight: '600'
+            }
+          },
+          error: { 
+            duration: 5000,
+            style: {
+              background: '#EF4444',
+              color: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontWeight: '600'
+            }
+          },
+          loading: {
+            duration: 3000,
+            style: {
+              background: '#3B82F6',
+              color: '#fff',
+              borderRadius: '12px'
+            }
+          }
+        }}
+      />
+
       <div className="page-header">
         <h1 className="page-title">Dashboard</h1>
         <p className="text-muted m-0">Welcome back, Supreme Admin</p>
@@ -212,7 +486,7 @@ export default function SADashboard() {
               <button 
                 onClick={handleDownloadPayments}
                 className="btn btn-sm btn-primary"
-                title="Download PDF"
+                title="Download PDF Report"
               >
                 <i className="fas fa-download"></i> Download
               </button>
@@ -228,14 +502,19 @@ export default function SADashboard() {
             <div className="table-container">
               <table>
                 <thead>
-                  <tr><th>Admin</th><th>Amount</th><th>Status</th></tr>
+                  <tr>
+                    <th>Admin</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {recentPayments.map(payment => (
                     <tr key={payment.id}>
                       <td>
                         <div className="font-semibold">{payment.admins?.name || 'Unknown'}</div>
-                        <div className="text-muted text-xs">{formatDate(payment.date)}</div>
+                        <div className="text-muted text-xs">{payment.admins?.email}</div>
                       </td>
                       <td className="font-bold">{formatCurrency(payment.amount)}</td>
                       <td>
@@ -243,6 +522,7 @@ export default function SADashboard() {
                           {payment.status || 'Pending'}
                         </span>
                       </td>
+                      <td className="text-muted text-xs">{formatDate(payment.date)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -260,7 +540,7 @@ export default function SADashboard() {
               <button 
                 onClick={handleDownloadAdmins}
                 className="btn btn-sm btn-primary"
-                title="Download PDF"
+                title="Download PDF Report"
               >
                 <i className="fas fa-download"></i> Download
               </button>
@@ -276,7 +556,12 @@ export default function SADashboard() {
             <div className="table-container">
               <table>
                 <thead>
-                  <tr><th>Name</th><th>Plan</th><th>Fee</th></tr>
+                  <tr>
+                    <th>Name</th>
+                    <th>Plan</th>
+                    <th>Fee</th>
+                    <th>Status</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {activeAdminsList.map(admin => (
@@ -287,6 +572,11 @@ export default function SADashboard() {
                       </td>
                       <td><span className="badge badge-info">{admin.subscription_plan || 'Monthly'}</span></td>
                       <td className="font-bold">{formatCurrency(admin.subscription_fee)}</td>
+                      <td>
+                        <span className={`badge ${admin.subscription_status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
+                          {admin.subscription_status}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
