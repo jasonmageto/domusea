@@ -636,7 +636,7 @@ function AppContent() {
       </a>
 
       <nav className="navbar" role="navigation" aria-label="Main navigation">
-        <div className="nav-container">
+        <div className="nav-container" style={{ padding: '0 16px' }}>
           <a
             href="#"
             className="brand"
