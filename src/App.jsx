@@ -40,6 +40,7 @@ import TenantSettings from './components/TenantSettings';
 // COMPONENT IMPORTS - AUTH & UI
 // ==========================================
 import LoginScreen from './components/LoginScreen';
+import DownloadAppButton from './components/DownloadAppButton'; // ✅ ADDED: PWA Install Button
 
 // ==========================================
 // SUBSCRIPTION EXPIRED COMPONENT
@@ -223,7 +224,7 @@ const UpdatePrompt = ({ onRefresh }) => {
     <div className="fixed bottom-4 right-4 z-[1200] animate-fadeIn update-prompt-wrapper">
       <div className="card p-4 shadow-lg border border-primary" style={{ maxWidth: 320 }}>
         <div className="flex items-center gap-3 mb-3">
-          <span className="text-2xl"></span>
+          <span className="text-2xl">🔄</span>
           <div>
             <h4 className="font-semibold text-primary">Update Available</h4>
             <p className="text-sm text-muted">A new version is ready</p>
@@ -414,7 +415,7 @@ function AppContent() {
 
   useEffect(() => {
     if (error && !loading) {
-      console.warn('️ Auth error detected:', error);
+      console.warn('⚠️ Auth error detected:', error);
       
       if (error.includes('expired') || error.includes('invalid')) {
         console.log('🔄 Attempting auth recovery...');
@@ -542,7 +543,7 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="card p-8 text-center max-w-md">
-          <div className="text-5xl mb-4">️</div>
+          <div className="text-5xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-danger mb-2">Unknown Role</h2>
           <p className="text-muted mb-6">
             Your role <code className="px-2 py-1 bg-faint rounded text-sm">"{role}"</code> is not recognized.
@@ -614,9 +615,13 @@ function AppContent() {
           </ul>
 
           <div className="nav-actions">
+            {/* ✅ PWA Download Button */}
+            <DownloadAppButton />
+            
             {/* ✅ View Toggle Button */}
             <ViewToggle isDesktopView={isDesktopView} onToggle={toggleViewMode} />
 
+            {/* ✅ Theme Toggle */}
             <button
               onClick={toggleTheme}
               className="theme-toggle"
@@ -627,6 +632,7 @@ function AppContent() {
               <span className="hide-mobile">{isDark ? 'Light' : 'Dark'}</span>
             </button>
 
+            {/* ✅ User Info */}
             <div
               className="user-info"
               title={`${userProfile?.name} • ${userRole}`}
@@ -643,6 +649,7 @@ function AppContent() {
               </div>
             </div>
 
+            {/* ✅ Logout Button */}
             <button
               onClick={logout}
               className="btn btn-danger btn-sm"
@@ -653,6 +660,7 @@ function AppContent() {
               <span className="hide-mobile">Logout</span>
             </button>
 
+            {/* ✅ Hamburger Menu */}
             <button
               className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
