@@ -19,12 +19,13 @@ export default function ManageTenants() {
   const [newTenantCredentials, setNewTenantCredentials] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  
-  const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', property: '', house: '',
-    rent: '', due_date: '', status: 'Active'
-  });
-  const [sendingBulkReminders, setSendingBulkReminders] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchTenants();
@@ -106,7 +107,6 @@ export default function ManageTenants() {
     });
   };
 
-  // ✅ FIXED: Beautiful PDF Export with jsPDF
   const downloadPDF = () => {
     if (filteredTenants.length === 0) {
       toast('No tenants to export', {
@@ -447,9 +447,9 @@ export default function ManageTenants() {
 
       <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12}}>
         <h2 style={{margin: 0}}>👥 Manage Tenants</h2>
-        <div style={{display: 'flex', gap: 12}}>
-          <button onClick={downloadCSV} className="btn" style={{background: 'var(--green)', color: 'white'}}>📊 CSV</button>
-          <button onClick={downloadPDF} className="btn" style={{background: 'var(--red)', color: 'white'}}>📄 PDF</button>
+        <div style={{display: 'flex', gap: 12, flexWrap: 'wrap'}}>
+          <button onClick={downloadCSV} className="btn" style={{background: 'var(--success)', color: 'white'}}>📊 CSV</button>
+          <button onClick={downloadPDF} className="btn" style={{background: 'var(--danger)', color: 'white'}}>📄 PDF</button>
           <button onClick={handleBulkReminders} disabled={sendingBulkReminders} className="btn" style={{background: '#f59e0b', color: 'white'}}>
             {sendingBulkReminders ? 'Sending...' : '📧 Bulk Reminders'}
           </button>
@@ -460,48 +460,96 @@ export default function ManageTenants() {
       <div className="card" style={{marginBottom: 20, padding: 16}}>
         <input type="text" placeholder="🔍 Search tenants..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           style={{width: '100%', padding: '10px', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 12}} />
-        <div style={{display: 'flex', gap: 8}}>
+        <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
           <button onClick={() => setStatusFilter('all')} className={`btn ${statusFilter === 'all' ? 'btn-primary' : ''}`}>All ({tenants.length})</button>
           <button onClick={() => setStatusFilter('active')} className={`btn ${statusFilter === 'active' ? 'btn-primary' : ''}`}>Active ({tenants.filter(t => t.status !== 'Vacated').length})</button>
         </div>
       </div>
 
       <div className="card">
-        <div style={{overflowX: 'auto'}}>
-          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: 800}}>
-            <thead>
-              <tr style={{borderBottom: '2px solid var(--border)'}}>
-                <th style={{padding: '12px 8px'}}>Name</th>
-                <th>Property</th>
-                <th>Unit</th>
-                <th>Rent</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th style={{textAlign: 'center'}}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTenants.map(t => (
-                <tr key={t.id} style={{borderBottom: '1px solid var(--border)'}}>
-                  <td style={{padding: '12px 8px'}}>{t.name}</td>
-                  <td>{t.property || 'N/A'}</td>
-                  <td>{t.house || 'N/A'}</td>
-                  <td style={{fontWeight: 600}}>KSh {t.rent?.toLocaleString()}</td>
-                  <td>{t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A'}</td>
-                  <td><span className={`badge ${t.status === 'Active' ? 'status-green' : 'status-amber'}`}>{t.status}</span></td>
-                  <td style={{textAlign: 'center'}}>
-                    <button onClick={() => { setEditingTenant(t); setFormData(t); setShowModal(true); }} className="btn btn-sm" style={{marginRight: 8}}>Edit</button>
-                  </td>
+        {isMobile ? (
+          // 📱 Mobile Card View
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {filteredTenants.map(tenant => (
+              <div key={tenant.id} className="card" style={{ padding: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: 18 }}>{tenant.name}</h3>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 14 }}>{tenant.email}</p>
+                  </div>
+                  <span className={`badge ${tenant.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
+                    {tenant.status}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Property</div>
+                    <div style={{ fontWeight: 600 }}>{tenant.property || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Unit</div>
+                    <div style={{ fontWeight: 600 }}>{tenant.house || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Rent</div>
+                    <div style={{ fontWeight: 700, color: 'var(--primary)' }}>KSh {tenant.rent?.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Due Date</div>
+                    <div style={{ fontWeight: 600 }}>
+                      {tenant.due_date ? new Date(tenant.due_date).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => { setEditingTenant(tenant); setFormData(tenant); setShowModal(true); }}
+                  className="btn btn-primary btn-full"
+                >
+                  Edit Tenant
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          // 💻 Desktop Table View
+          <div style={{overflowX: 'auto'}}>
+            <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: 800}}>
+              <thead>
+                <tr style={{borderBottom: '2px solid var(--border)'}}>
+                  <th style={{padding: '12px 8px'}}>Name</th>
+                  <th>Property</th>
+                  <th>Unit</th>
+                  <th>Rent</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th style={{textAlign: 'center'}}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filteredTenants.map(t => (
+                  <tr key={t.id} style={{borderBottom: '1px solid var(--border)'}}>
+                    <td style={{padding: '12px 8px'}}>{t.name}</td>
+                    <td>{t.property || 'N/A'}</td>
+                    <td>{t.house || 'N/A'}</td>
+                    <td style={{fontWeight: 600}}>KSh {t.rent?.toLocaleString()}</td>
+                    <td>{t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A'}</td>
+                    <td><span className={`badge ${t.status === 'Active' ? 'status-green' : 'status-amber'}`}>{t.status}</span></td>
+                    <td style={{textAlign: 'center'}}>
+                      <button onClick={() => { setEditingTenant(t); setFormData(t); setShowModal(true); }} className="btn btn-sm" style={{marginRight: 8}}>Edit</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {showModal && (
-        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card" style={{width: '100%', maxWidth: 500}}>
+        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: isMobile ? '16px' : '0'}}>
+          <div className="card" style={{width: '100%', maxWidth: 500, borderRadius: isMobile ? 0 : undefined}}>
             <h3>{editingTenant ? 'Edit Tenant' : 'Add New Tenant'}</h3>
             <form onSubmit={handleSubmit}>
               <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required style={{width: '100%', marginBottom: 12, padding: 10}} />
@@ -509,9 +557,9 @@ export default function ManageTenants() {
               <input type="text" placeholder="Property" value={formData.property} onChange={e => setFormData({...formData, property: e.target.value})} style={{width: '100%', marginBottom: 12, padding: 10}} />
               <input type="text" placeholder="House/Unit" value={formData.house} onChange={e => setFormData({...formData, house: e.target.value})} style={{width: '100%', marginBottom: 12, padding: 10}} />
               <input type="number" placeholder="Rent" value={formData.rent} onChange={e => setFormData({...formData, rent: e.target.value})} required style={{width: '100%', marginBottom: 12, padding: 10}} />
-              <div style={{display: 'flex', gap: 12, justifyContent: 'flex-end'}}>
+              <div style={{display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap'}}>
                 <button type="button" className="btn" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{creating ? 'Saving...' : 'Save Tenant'}</button>
+                <button type="submit" className="btn btn-primary" style={{flex: isMobile ? 1 : 'none'}}>{creating ? 'Saving...' : 'Save Tenant'}</button>
               </div>
             </form>
           </div>
@@ -520,8 +568,8 @@ export default function ManageTenants() {
 
       {/* Password Modal for New Tenants */}
       {showPasswordModal && newTenantCredentials && (
-        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001}}>
-          <div className="card" style={{width: '100%', maxWidth: 400, padding: 24}}>
+        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001, padding: isMobile ? '16px' : '0'}}>
+          <div className="card" style={{width: '100%', maxWidth: 400, padding: 24, borderRadius: isMobile ? 0 : undefined}}>
             <h3 style={{margin: '0 0 16px 0'}}>🎉 Tenant Created!</h3>
             <p style={{margin: '0 0 16px 0', color: 'var(--text-muted)'}}>
               Share these credentials with the new tenant:
