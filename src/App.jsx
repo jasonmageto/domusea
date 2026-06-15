@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import './styles/global.css';
 import { supabase } from './supabaseClient';
+import { Toaster } from 'react-hot-toast';
 
 // ==========================================
 // COMPONENT IMPORTS - SUPREME ADMIN
@@ -40,7 +41,7 @@ import TenantSettings from './components/TenantSettings';
 // COMPONENT IMPORTS - AUTH & UI
 // ==========================================
 import LoginScreen from './components/LoginScreen';
-import DownloadAppButton from './components/DownloadAppButton'; // ✅ ADDED: PWA Install Button
+import DownloadAppButton from './components/DownloadAppButton';
 
 // ==========================================
 // SUBSCRIPTION EXPIRED COMPONENT
@@ -128,19 +129,19 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
         <p className="frozen-text">Your account has been frozen due to an overdue subscription.</p>
         
         <div className="frozen-contact" style={{ textAlign: 'left' }}>
-          <strong style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Account Details</strong>
+          <strong style={{ display: 'block', marginBottom: '8px', fontSize: 'clamp(0.875rem, 2.5vw, 1rem)' }}>Account Details</strong>
           <div style={{ padding: '12px', background: 'var(--bg-faint)', borderRadius: '6px' }}>
             <div style={{ marginBottom: '8px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '2px' }}>Name</div>
-              <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{userProfile?.name || 'N/A'}</div>
+              <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: 'var(--text-muted)', marginBottom: '2px' }}>Name</div>
+              <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)' }}>{userProfile?.name || 'N/A'}</div>
             </div>
             <div style={{ marginBottom: '8px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '2px' }}>Email</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{userProfile?.email || 'N/A'}</div>
+              <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: 'var(--text-muted)', marginBottom: '2px' }}>Email</div>
+              <div style={{ fontSize: 'clamp(0.875rem, 2.25vw, 0.9375rem)', color: 'var(--text-secondary)' }}>{userProfile?.email || 'N/A'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '2px' }}>Amount Due</div>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--danger)' }}>
+              <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', color: 'var(--text-muted)', marginBottom: '2px' }}>Amount Due</div>
+              <div style={{ fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: '700', color: 'var(--danger)' }}>
                 KSh {userProfile?.subscription_fee?.toLocaleString() || '0'}
               </div>
             </div>
@@ -149,22 +150,27 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
 
         {paymentStatus === 'success' && (
           <div style={{ padding: '16px', background: 'var(--success-bg)', border: '2px solid var(--success)', borderRadius: '12px', marginBottom: '16px', color: 'var(--success-dark)', textAlign: 'center', animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>✅</div>
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>Payment Detected!</div>
-            <div style={{ fontSize: '13px' }}>Redirecting to dashboard...</div>
+            <div style={{ fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', marginBottom: '8px' }}>✅</div>
+            <div style={{ fontWeight: '600', marginBottom: '4px', fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)' }}>Payment Detected!</div>
+            <div style={{ fontSize: 'clamp(0.8125rem, 2.25vw, 0.875rem)' }}>Redirecting to dashboard...</div>
           </div>
         )}
 
         {paymentStatus === 'error' && (
           <div style={{ padding: '16px', background: 'var(--danger-bg)', border: '2px solid var(--danger)', borderRadius: '12px', marginBottom: '16px', color: 'var(--danger-dark)', textAlign: 'center' }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>❌</div>
-            <div style={{ fontWeight: '600', marginBottom: '4px' }}>Payment Failed</div>
-            <div style={{ fontSize: '13px' }}>{paymentError || 'Please try again'}</div>
+            <div style={{ fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', marginBottom: '8px' }}>❌</div>
+            <div style={{ fontWeight: '600', marginBottom: '4px', fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)' }}>Payment Failed</div>
+            <div style={{ fontSize: 'clamp(0.8125rem, 2.25vw, 0.875rem)' }}>{paymentError || 'Please try again'}</div>
           </div>
         )}
 
         <div className="frozen-buttons" style={{ gap: '12px' }}>
-          <button onClick={handlePayment} disabled={paying || paymentStatus === 'success'} className="btn btn-primary btn-full" style={{ padding: '14px 20px', fontSize: '15px', opacity: paying || paymentStatus === 'success' ? 0.7 : 1, cursor: paying || paymentStatus === 'success' ? 'not-allowed' : 'pointer' }}>
+          <button onClick={handlePayment} disabled={paying || paymentStatus === 'success'} className="btn btn-primary btn-full" style={{ 
+            padding: 'clamp(0.875rem, 3vw, 1rem) clamp(1rem, 3.5vw, 1.25rem)', 
+            fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)',
+            opacity: paying || paymentStatus === 'success' ? 0.7 : 1, 
+            cursor: paying || paymentStatus === 'success' ? 'not-allowed' : 'pointer' 
+          }}>
             {paying ? (
               <><i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>Processing...</>
             ) : paymentStatus === 'success' ? (
@@ -174,27 +180,30 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
             )}
           </button>
           
-          <button onClick={() => window.location.href = 'tel:0711333436'} className="btn btn-secondary btn-full" disabled={paymentStatus === 'processing'} style={{ padding: '12px 20px' }}>
+          <button onClick={() => window.location.href = 'tel:0711333436'} className="btn btn-secondary btn-full" disabled={paymentStatus === 'processing'} style={{ padding: 'clamp(0.75rem, 2.5vw, 0.875rem) clamp(1rem, 3vw, 1.125rem)' }}>
             <i className="fas fa-phone" style={{ marginRight: '8px' }}></i>Call Support
           </button>
           
-          <button onClick={handleLogout} className="btn btn-ghost btn-full" disabled={paymentStatus === 'processing'} style={{ padding: '12px 20px', cursor: paymentStatus === 'processing' ? 'not-allowed' : 'pointer' }}>
+          <button onClick={handleLogout} className="btn btn-ghost btn-full" disabled={paymentStatus === 'processing'} style={{ 
+            padding: 'clamp(0.75rem, 2.5vw, 0.875rem) clamp(1rem, 3vw, 1.125rem)',
+            cursor: paymentStatus === 'processing' ? 'not-allowed' : 'pointer' 
+          }}>
             <i className="fas fa-sign-out-alt" style={{ marginRight: '8px' }}></i>Logout
           </button>
         </div>
 
         {paymentStatus === 'processing' && (
           <div style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-faint)', borderRadius: '8px', textAlign: 'center', border: '1px dashed var(--border-primary)' }}>
-            <div style={{ fontSize: '28px', marginBottom: '8px' }}>⏳</div>
-            <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>Waiting for Payment...</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Please complete the payment on your phone.<br/>We'll automatically redirect you once confirmed.</div>
-            <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: 'clamp(1.5rem, 5vw, 1.75rem)', marginBottom: '8px' }}>⏳</div>
+            <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px', fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)' }}>Waiting for Payment...</div>
+            <div style={{ fontSize: 'clamp(0.8125rem, 2.25vw, 0.875rem)', color: 'var(--text-muted)' }}>Please complete the payment on your phone.<br/>We'll automatically redirect you once confirmed.</div>
+            <div style={{ marginTop: '12px', fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)', color: 'var(--text-muted)' }}>
               <i className="fas fa-clock" style={{ marginRight: '6px' }}></i>Checking every 3 seconds...
             </div>
           </div>
         )}
 
-        <div style={{ marginTop: '20px', padding: '12px', background: 'var(--info-bg)', borderRadius: '8px', fontSize: '12px', color: 'var(--info)', textAlign: 'center', border: '1px solid var(--info)' }}>
+        <div style={{ marginTop: '20px', padding: '12px', background: 'var(--info-bg)', borderRadius: '8px', fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)', color: 'var(--info)', textAlign: 'center', border: '1px solid var(--info)' }}>
           <i className="fas fa-info-circle" style={{ marginRight: '6px' }}></i>
           After payment, your account will be reactivated automatically within 30 seconds.
         </div>
@@ -226,18 +235,22 @@ const UpdatePrompt = ({ onRefresh }) => {
         <div className="flex items-center gap-3 mb-3">
           <span className="text-2xl">🔄</span>
           <div>
-            <h4 className="font-semibold text-primary">Update Available</h4>
-            <p className="text-sm text-muted">A new version is ready</p>
+            <h4 className="font-semibold text-primary" style={{ fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)' }}>Update Available</h4>
+            <p className="text-sm text-muted" style={{ fontSize: 'clamp(0.8125rem, 2.25vw, 0.875rem)' }}>A new version is ready</p>
           </div>
         </div>
-        <button onClick={handleRefresh} disabled={updating} className="btn btn-primary btn-sm w-full" style={{ opacity: updating ? 0.7 : 1, cursor: updating ? 'not-allowed' : 'pointer' }}>
+        <button onClick={handleRefresh} disabled={updating} className="btn btn-primary btn-sm w-full" style={{ 
+          opacity: updating ? 0.7 : 1, 
+          cursor: updating ? 'not-allowed' : 'pointer',
+          fontSize: 'clamp(0.875rem, 2.5vw, 0.9375rem)'
+        }}>
           {updating ? (
             <><i className="fas fa-spinner fa-spin" style={{ marginRight: 8 }}></i>Updating...</>
           ) : (
             <><i className="fas fa-sync" style={{ marginRight: 8 }}></i>Refresh Now</>
           )}
         </button>
-        <button onClick={handleDismiss} className="btn btn-ghost btn-sm w-full mt-2" style={{ fontSize: 12 }}>Remind me later</button>
+        <button onClick={handleDismiss} className="btn btn-ghost btn-sm w-full mt-2" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)' }}>Remind me later</button>
       </div>
     </div>
   );
@@ -249,20 +262,23 @@ const UpdatePrompt = ({ onRefresh }) => {
 const ViewToggle = ({ isDesktopView, onToggle }) => (
   <button
     onClick={onToggle}
-    className="btn btn-sm"
+    className="btn btn-sm view-toggle-btn"
+    title={isDesktopView ? 'Switch to Mobile View' : 'Switch to Desktop View'}
     style={{
-      background: 'var(--bg-faint)',
-      color: 'var(--text-secondary)',
-      border: '1px solid var(--border)',
-      borderRadius: '20px',
-      padding: '6px 12px',
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
-      fontSize: '12px',
+      padding: 'clamp(0.375rem, 1.5vw, 0.5rem) clamp(0.75rem, 2.5vw, 0.875rem)',
+      borderRadius: 'var(--radius-full)',
+      border: '1px solid var(--border-primary)',
+      background: 'var(--bg-faint)',
+      color: 'var(--text-secondary)',
+      fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)',
       fontWeight: 600,
-      transition: 'all 0.2s',
-      whiteSpace: 'nowrap'
+      transition: 'var(--transition)',
+      whiteSpace: 'nowrap',
+      minWidth: '44px',
+      minHeight: '44px'
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.background = 'var(--primary)';
@@ -272,11 +288,10 @@ const ViewToggle = ({ isDesktopView, onToggle }) => (
     onMouseLeave={(e) => {
       e.currentTarget.style.background = 'var(--bg-faint)';
       e.currentTarget.style.color = 'var(--text-secondary)';
-      e.currentTarget.style.borderColor = 'var(--border)';
+      e.currentTarget.style.borderColor = 'var(--border-primary)';
     }}
-    title={isDesktopView ? 'Switch to Mobile View' : 'Switch to Desktop View'}
   >
-    <i className={`fas ${isDesktopView ? 'fa-mobile-alt' : 'fa-desktop'}`}></i>
+    <i className={`fas ${isDesktopView ? 'fa-mobile-alt' : 'fa-desktop'}`} style={{ fontSize: 'clamp(0.875rem, 2.5vw, 1rem)' }}></i>
     <span className="hide-mobile">{isDesktopView ? 'Mobile' : 'Desktop'}</span>
   </button>
 );
@@ -291,7 +306,7 @@ function AppContent() {
   const [isDark, setIsDark] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   
-  // ✅ New: Desktop View State
+  // ✅ Desktop View State
   const [isDesktopView, setIsDesktopView] = useState(() => {
     const saved = localStorage.getItem('domusea-view-mode');
     return saved === 'desktop';
@@ -321,7 +336,6 @@ function AppContent() {
     setIsDesktopView(newMode);
     localStorage.setItem('domusea-view-mode', newMode ? 'desktop' : 'auto');
     
-    // Force body to have desktop styles when in desktop mode
     if (newMode) {
       document.body.style.minWidth = '1024px';
       document.body.style.overflowX = 'auto';
@@ -429,8 +443,8 @@ function AppContent() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
-          <p className="text-muted text-lg font-medium">Loading DomusEA...</p>
-          <p className="text-muted text-sm mt-2">Secure Property Management Platform</p>
+          <p className="text-muted text-lg font-medium" style={{ fontSize: 'clamp(1rem, 3vw, 1.125rem)' }}>Loading DomusEA...</p>
+          <p className="text-muted text-sm mt-2" style={{ fontSize: 'clamp(0.875rem, 2.5vw, 0.9375rem)' }}>Secure Property Management Platform</p>
         </div>
       </div>
     );
@@ -543,17 +557,17 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="card p-8 text-center max-w-md">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-danger mb-2">Unknown Role</h2>
-          <p className="text-muted mb-6">
-            Your role <code className="px-2 py-1 bg-faint rounded text-sm">"{role}"</code> is not recognized.
+          <div className="text-5xl mb-4" style={{ fontSize: 'clamp(2.5rem, 8vw, 3rem)' }}>⚠️</div>
+          <h2 className="text-xl font-bold text-danger mb-2" style={{ fontSize: 'clamp(1.125rem, 3.5vw, 1.25rem)' }}>Unknown Role</h2>
+          <p className="text-muted mb-6" style={{ fontSize: 'clamp(0.875rem, 2.5vw, 0.9375rem)' }}>
+            Your role <code className="px-2 py-1 bg-faint rounded text-sm" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)' }}>"{role}"</code> is not recognized.
             Please contact support to resolve this issue.
           </p>
-          <div className="flex gap-3">
-            <button onClick={logout} className="btn btn-primary flex-1">
+          <div className="flex gap-3" style={{ flexDirection: 'column' }}>
+            <button onClick={logout} className="btn btn-primary btn-full" style={{ fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)' }}>
               <i className="fas fa-sign-out-alt"></i> Logout
             </button>
-            <button onClick={() => window.location.href = 'tel:0711333436'} className="btn btn-secondary flex-1">
+            <button onClick={() => window.location.href = 'tel:0711333436'} className="btn btn-secondary btn-full" style={{ fontSize: 'clamp(0.9375rem, 2.5vw, 1rem)' }}>
               <i className="fas fa-phone"></i> Call Support
             </button>
           </div>
@@ -567,9 +581,58 @@ function AppContent() {
 
   return (
     <div className={`app-wrapper ${isDark ? 'dark' : ''} ${isDesktopView ? 'force-desktop-view' : ''}`}>
+      {/* ✅ Global Toast Container */}
+      <Toaster 
+        position="top-right"
+        gutter={12}
+        containerStyle={{ margin: '8px' }}
+        toastOptions={{
+          duration: 4000,
+          success: { 
+            iconTheme: { primary: '#10B981', secondary: '#fff' },
+            style: {
+              background: '#fff',
+              color: '#1F2937',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              border: '1px solid #E5E7EB',
+              fontSize: 'clamp(0.875rem, 2.5vw, 0.9375rem)',
+              fontWeight: '600',
+              padding: 'clamp(0.875rem, 2.5vw, 1rem) clamp(1rem, 3vw, 1.25rem)'
+            }
+          },
+          error: { 
+            iconTheme: { primary: '#EF4444', secondary: '#fff' },
+            style: {
+              background: '#fff',
+              color: '#1F2937',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              border: '1px solid #FCA5A5',
+              fontSize: 'clamp(0.875rem, 2.5vw, 0.9375rem)',
+              fontWeight: '600',
+              padding: 'clamp(0.875rem, 2.5vw, 1rem) clamp(1rem, 3vw, 1.25rem)'
+            }
+          },
+          loading: {
+            style: {
+              background: '#fff',
+              color: '#1F2937',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              border: '1px solid #93C5FD',
+              fontSize: 'clamp(0.875rem, 2.5vw, 0.9375rem)',
+              fontWeight: '600',
+              padding: 'clamp(0.875rem, 2.5vw, 1rem) clamp(1rem, 3vw, 1.25rem)'
+            }
+          }
+        }}
+      />
+
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-white px-4 py-2 rounded-lg z-50"
+        style={{ fontSize: 'clamp(0.875rem, 2.5vw, 0.9375rem)' }}
       >
         Skip to main content
       </a>
@@ -627,6 +690,7 @@ function AppContent() {
               className="theme-toggle"
               aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
               title="Toggle theme"
+              style={{ fontSize: 'clamp(0.8125rem, 2.25vw, 0.875rem)' }}
             >
               <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
               <span className="hide-mobile">{isDark ? 'Light' : 'Dark'}</span>
@@ -639,13 +703,17 @@ function AppContent() {
               role="button"
               tabIndex={0}
             >
-              <div className="user-avatar" aria-hidden="true">
+              <div className="user-avatar" aria-hidden="true" style={{ 
+                fontSize: 'clamp(0.8125rem, 2.25vw, 0.875rem)',
+                width: 'clamp(2rem, 6vw, 2.25rem)',
+                height: 'clamp(2rem, 6vw, 2.25rem)'
+              }}>
                 {userProfile?.name?.charAt(0).toUpperCase()}
                 {userProfile?.name?.split(' ')?.[1]?.charAt(0).toUpperCase() || ''}
               </div>
               <div className="user-details hide-mobile">
-                <div className="user-name">{userProfile?.name}</div>
-                <div className="user-role">{userRole}</div>
+                <div className="user-name" style={{ fontSize: 'clamp(0.8125rem, 2.25vw, 0.875rem)' }}>{userProfile?.name}</div>
+                <div className="user-role" style={{ fontSize: 'clamp(0.6875rem, 2vw, 0.75rem)' }}>{userRole}</div>
               </div>
             </div>
 
@@ -655,6 +723,7 @@ function AppContent() {
               className="btn btn-danger btn-sm"
               title="Logout"
               aria-label="Logout from your account"
+              style={{ fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)', padding: 'clamp(0.5rem, 2vw, 0.625rem) clamp(0.75rem, 2.5vw, 0.875rem)' }}
             >
               <i className="fas fa-sign-out-alt"></i>
               <span className="hide-mobile">Logout</span>
@@ -667,6 +736,7 @@ function AppContent() {
               aria-label="Toggle navigation menu"
               aria-expanded={isMobileMenuOpen}
               aria-controls="navMenu"
+              style={{ width: 'clamp(2.5rem, 7vw, 2.75rem)', height: 'clamp(2.5rem, 7vw, 2.75rem)' }}
             >
               <span></span>
               <span></span>
@@ -683,7 +753,7 @@ function AppContent() {
       <footer className="footer" role="contentinfo">
         <div className="footer-content">
           <div className="footer-links">
-            <a href="tel:0711333436">
+            <a href="tel:0711333436" style={{ fontSize: 'clamp(0.8125rem, 2.5vw, 0.9375rem)' }}>
               <i className="fas fa-phone"></i>
               <span>0711 333 436</span>
             </a>
@@ -691,22 +761,24 @@ function AppContent() {
               href="https://wa.me/254711333436"
               target="_blank"
               rel="noopener noreferrer"
+              style={{ fontSize: 'clamp(0.8125rem, 2.5vw, 0.9375rem)' }}
             >
               <i className="fab fa-whatsapp"></i>
               <span>WhatsApp</span>
             </a>
-            <a href="#">
+            <a href="#" style={{ fontSize: 'clamp(0.8125rem, 2.5vw, 0.9375rem)' }}>
               <i className="fas fa-shield-alt"></i>
               <span>Restricted Access</span>
             </a>
           </div>
-          <p className="footer-copyright">
+          <p className="footer-copyright" style={{ fontSize: 'clamp(0.75rem, 2.25vw, 0.8125rem)', marginTop: 'clamp(0.75rem, 2vw, 1rem)' }}>
             © {new Date().getFullYear()} DomusEA. All rights reserved. |
             Developed by{' '}
             <a
               href="https://elizontech.com"
               target="_blank"
               rel="noopener noreferrer"
+              style={{ fontSize: 'inherit' }}
             >
               Elizon Tech
             </a>
