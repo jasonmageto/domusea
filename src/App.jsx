@@ -188,7 +188,8 @@ const SubscriptionExpired = ({ userProfile, logout }) => {
             padding: 'clamp(0.75rem, 2.5vw, 0.875rem) clamp(1rem, 3vw, 1.125rem)',
             cursor: paymentStatus === 'processing' ? 'not-allowed' : 'pointer' 
           }}>
-            <i className="fas fa-sign-out-alt" style={{ marginRight: '8px' }}></i>Logout
+            <i className="fas fa-sign-out-alt"></i>
+            <span className="hide-mobile">Logout</span>
           </button>
         </div>
 
@@ -306,7 +307,6 @@ function AppContent() {
   const [isDark, setIsDark] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   
-  // ✅ Desktop View State
   const [isDesktopView, setIsDesktopView] = useState(() => {
     const saved = localStorage.getItem('domusea-view-mode');
     return saved === 'desktop';
@@ -330,7 +330,6 @@ function AppContent() {
     localStorage.setItem('domusea-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  // ✅ Toggle View Mode
   const toggleViewMode = () => {
     const newMode = !isDesktopView;
     setIsDesktopView(newMode);
@@ -581,7 +580,6 @@ function AppContent() {
 
   return (
     <div className={`app-wrapper ${isDark ? 'dark' : ''} ${isDesktopView ? 'force-desktop-view' : ''}`}>
-      {/* ✅ Global Toast Container */}
       <Toaster 
         position="top-right"
         gutter={12}
@@ -678,13 +676,9 @@ function AppContent() {
           </ul>
 
           <div className="nav-actions">
-            {/* ✅ PWA Download Button */}
             <DownloadAppButton />
-            
-            {/* ✅ View Toggle Button */}
             <ViewToggle isDesktopView={isDesktopView} onToggle={toggleViewMode} />
 
-            {/* ✅ Theme Toggle */}
             <button
               onClick={toggleTheme}
               className="theme-toggle"
@@ -696,7 +690,6 @@ function AppContent() {
               <span className="hide-mobile">{isDark ? 'Light' : 'Dark'}</span>
             </button>
 
-            {/* ✅ User Info */}
             <div
               className="user-info"
               title={`${userProfile?.name} • ${userRole}`}
@@ -717,19 +710,20 @@ function AppContent() {
               </div>
             </div>
 
-            {/* ✅ Logout Button */}
             <button
               onClick={logout}
               className="btn btn-danger btn-sm"
               title="Logout"
               aria-label="Logout from your account"
-              style={{ fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)', padding: 'clamp(0.5rem, 2vw, 0.625rem) clamp(0.75rem, 2.5vw, 0.875rem)' }}
+              style={{ 
+                fontSize: 'clamp(0.75rem, 2vw, 0.8125rem)', 
+                padding: 'clamp(0.5rem, 2vw, 0.625rem) clamp(0.75rem, 2.5vw, 0.875rem)' 
+              }}
             >
               <i className="fas fa-sign-out-alt"></i>
               <span className="hide-mobile">Logout</span>
             </button>
 
-            {/* ✅ Hamburger Menu */}
             <button
               className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
