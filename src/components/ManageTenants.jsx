@@ -20,6 +20,8 @@ export default function ManageTenants() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  // ✅ FIX: Added missing state variable
+  const [sendingBulkReminders, setSendingBulkReminders] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
