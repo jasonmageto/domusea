@@ -20,10 +20,7 @@ export default function SADashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
+  // ✅ Fetch dashboard data function
   async function fetchDashboardData() {
     try {
       console.log('📊 Fetching Supreme Admin Dashboard Stats...');
@@ -66,7 +63,7 @@ export default function SADashboard() {
 
       if (paymentsError) throw paymentsError;
 
-      // ✅ Calculate stats - Case-insensitive status filter
+      // Calculate stats - Case-insensitive status filter
       const now = new Date();
       const confirmedPayments = paymentsData?.filter(p => 
         p.status?.toLowerCase() === 'confirmed'
@@ -81,7 +78,7 @@ export default function SADashboard() {
 
       const totalReceived = confirmedPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
       
-      // ✅ Case-insensitive pending filter
+      // Case-insensitive pending filter
       const pendingPaymentsCount = paymentsData?.filter(p => 
         p.status?.toLowerCase() === 'pending'
       )?.length || 0;
@@ -108,6 +105,24 @@ export default function SADashboard() {
       setLoading(false);
     }
   }
+
+  // ✅ Auto-refresh when subscription is renewed elsewhere
+  useEffect(() => {
+    fetchDashboardData();
+
+    // Listen for refresh signals from other components
+    const handleRefresh = () => {
+      console.log('🔄 Dashboard refresh triggered');
+      fetchDashboardData();
+    };
+
+    window.addEventListener('dashboard-refresh', handleRefresh);
+
+    // Cleanup listener on unmount
+    return () => {
+      window.removeEventListener('dashboard-refresh', handleRefresh);
+    };
+  }, []);
 
   // ✅ Beautiful PDF Export for Payments
   const exportPaymentsToPDF = (payments, filename) => {
