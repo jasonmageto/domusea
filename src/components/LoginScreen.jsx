@@ -62,17 +62,31 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
   return (
     <div className={`login-screen-container ${isDark ? 'dark' : ''}`}>
-      {/* Theme Toggle - Top Right */}
-      {toggleTheme && (
-        <button 
-          onClick={toggleTheme}
-          className="theme-toggle-btn"
-          aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-        >
-          <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
-          <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
-        </button>
-      )}
+      {/* ✅ Top Right Controls: Theme Toggle + Download App (Stacked on Mobile) */}
+      <div className="top-controls">
+        {toggleTheme && (
+          <button 
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+          >
+            <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
+            <span className="hide-mobile">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+        )}
+        
+        {/* ✅ Download App Button - Now Below Theme Toggle on Mobile */}
+        {!isAppInstalled && (
+          <button 
+            onClick={handleInstallApp}
+            className="download-app-btn-top"
+            aria-label="Download DomusEA App"
+          >
+            <i className="fas fa-mobile-alt"></i>
+            <span className="hide-mobile">Download App</span>
+          </button>
+        )}
+      </div>
 
       {/* Left Side - Quote Section */}
       <div className="left-panel">
@@ -84,11 +98,11 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               "The art of building is not just about structures; it's about creating spaces where communities thrive. DomusEA handles the details so you can focus on the home."
             </p>
             
-            {/* ✅ DOWNLOAD APP BUTTON - Left Panel */}
+            {/* Desktop-only download button in left panel */}
             {!isAppInstalled && (
               <button 
                 onClick={handleInstallApp}
-                className="download-app-btn"
+                className="download-app-btn hide-mobile"
                 aria-label="Download DomusEA App"
               >
                 <i className="fas fa-mobile-alt"></i>
@@ -275,12 +289,20 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
         }
         
-        /* Theme Toggle Button */
-        .theme-toggle-btn {
+        /* ✅ Top Controls Container - Stacked on Mobile */
+        .top-controls {
           position: absolute;
           top: 20px;
           right: 20px;
           z-index: 1000;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 12px;
+        }
+        
+        /* Theme Toggle Button */
+        .theme-toggle-btn {
           padding: 10px 20px;
           background: var(--theme-btn-bg);
           border: 1px solid var(--theme-btn-border);
@@ -294,6 +316,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           color: var(--theme-btn-text);
           box-shadow: var(--shadow-sm);
           transition: all 0.2s;
+          min-height: 44px;
         }
         
         .theme-toggle-btn:hover {
@@ -301,7 +324,37 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           box-shadow: var(--shadow);
         }
         
-        /* ✅ DOWNLOAD APP BUTTON - Left Panel */
+        /* ✅ Download App Button - Top Right (Mobile Stacked) */
+        .download-app-btn-top {
+          padding: 10px 20px;
+          background: var(--theme-btn-bg);
+          border: 1px solid var(--theme-btn-border);
+          border-radius: 8px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--theme-btn-text);
+          box-shadow: var(--shadow-sm);
+          transition: all 0.2s;
+          min-height: 44px;
+          min-width: 44px;
+          justify-content: center;
+        }
+        
+        .download-app-btn-top:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow);
+          background: var(--bg-right);
+        }
+        
+        .download-app-btn-top i {
+          font-size: 16px;
+        }
+        
+        /* ✅ DOWNLOAD APP BUTTON - Left Panel (Desktop Only) */
         .download-app-btn {
           display: inline-flex;
           align-items: center;
@@ -737,27 +790,37 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           to { transform: translateX(0); }
         }
         
-        @media (max-width: 968px) {
+        /* ✅ Mobile Responsive - Stack Controls */
+        @media (max-width: 768px) {
           .left-panel {
             display: none;
           }
-        }
-        
-        @media (max-width: 480px) {
+          
+          .top-controls {
+            top: 12px;
+            right: 12px;
+            gap: 8px;
+          }
+          
+          .theme-toggle-btn,
+          .download-app-btn-top {
+            padding: 8px 12px;
+            font-size: 13px;
+            min-height: 40px;
+            min-width: 40px;
+          }
+          
+          .theme-toggle-btn span,
+          .download-app-btn-top span {
+            display: none;
+          }
+          
           .login-container {
             padding: 40px 24px;
           }
           
           .welcome-title {
             font-size: 28px;
-          }
-          
-          .main-quote {
-            font-size: 32px;
-          }
-          
-          .theme-toggle-btn span {
-            display: none;
           }
           
           .footer-contact {
@@ -768,11 +831,34 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           .footer-divider {
             display: none;
           }
+        }
+        
+        @media (max-width: 480px) {
+          .top-controls {
+            top: 8px;
+            right: 8px;
+          }
           
-          .download-app-btn {
-            padding: 12px 24px;
-            font-size: 14px;
-            gap: 8px;
+          .theme-toggle-btn,
+          .download-app-btn-top {
+            padding: 8px;
+            min-height: 36px;
+            min-width: 36px;
+          }
+          
+          .login-container {
+            padding: 32px 20px;
+          }
+        }
+        
+        /* ✅ Utility: Hide on Mobile */
+        .hide-mobile {
+          display: block;
+        }
+        
+        @media (max-width: 768px) {
+          .hide-mobile {
+            display: none !important;
           }
         }
       `}</style>
