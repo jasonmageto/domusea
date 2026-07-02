@@ -4,29 +4,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
-    react(), // ✅ Ensures JSX is parsed correctly
+    react(),
     VitePWA({
       registerType: 'prompt',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24
-              },
-              networkTimeoutSeconds: 10
-            }
-          }
-        ]
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}']
       },
       manifest: {
         name: 'DomusEA',
         short_name: 'DomusEA',
+        description: 'Secure Property Management Platform',
         theme_color: '#4F46E5',
         background_color: '#F8FAFC',
         display: 'standalone'
@@ -45,9 +32,18 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          supabase: ['@supabase/supabase-js']
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('@supabase')) {
+              return 'vendor-supabase';
+            }
+            if (id.includes('recharts')) {
+              return 'vendor-charts';
+            }
+          }
         }
       }
     }
