@@ -146,7 +146,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                 <span className="input-icon">📧</span>
                 <input
                   type="email"
-                  placeholder="name@company.com"
+                  placeholder="Your email"
                   className="input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

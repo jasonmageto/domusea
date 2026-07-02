@@ -27,7 +27,7 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     
-    <!-- 🔹 Title -->
+    <!--  Title -->
     <title>DomusEA</title>
     
     <!-- 🔹 Fonts & Icons -->
@@ -45,17 +45,7 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- ✅ FIX: Removed ?v=1.0.0 to prevent parser errors -->
     <script type="module" src="/src/main.jsx"></script>
-    
-    <!-- 🔹 Service Worker Registration -->
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js")
-            .then(reg => console.log('✅ SW registered:', reg.scope))
-            .catch(err => console.log('❌ SW registration failed:', err));
-        });
-      }
-    </script>
   </body>
 </html>
