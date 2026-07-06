@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
-import { Moon, Sun, Smartphone, Mail, Lock, Eye, EyeOff, ArrowRight, Building2, Phone, MessageCircle, Shield, AlertTriangle } from "lucide-react";
+import { 
+  Moon, Sun, Smartphone, Mail, Lock, Eye, EyeOff, 
+  ArrowRight, Building2, Phone, MessageCircle, Shield, AlertTriangle 
+} from "lucide-react";
 
+// ─────────────────────────────────────────────────────────────
+// COMPONENT: Logo
+// ─────────────────────────────────────────────────────────────
 function Logo({ size = 20 }) {
   return (
     <span
@@ -10,6 +16,11 @@ function Logo({ size = 20 }) {
         width: size + 16,
         height: size + 16,
         background: "linear-gradient(135deg, #34D399 0%, #0B2545 55%, #F59E0B 100%)",
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '12px',
+        flexShrink: 0
       }}
     >
       <Building2 size={size} strokeWidth={2.25} color="#ffffff" />
@@ -17,7 +28,11 @@ function Logo({ size = 20 }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// MAIN COMPONENT: LoginScreen
+// ─────────────────────────────────────────────────────────────
 export default function LoginScreen({ isDark, toggleTheme }) {
+  // ─── State ─────────────────────────────────────────────────
   const { login, error: authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,15 +42,19 @@ export default function LoginScreen({ isDark, toggleTheme }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
 
+  // ─── PWA Install Handler ───────────────────────────────────
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsAppInstalled(true);
     }
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
@@ -43,37 +62,47 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
   const handleInstallApp = async () => {
     if (!deferredPrompt) return;
+
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
+    
     if (outcome === 'accepted') {
       setIsAppInstalled(true);
       setDeferredPrompt(null);
     }
   };
 
+  // ─── Form Submit Handler ───────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevent double submission
+    if (loading) return;
+    
     setError('');
     setLoading(true);
+
     try {
       await login(email, password);
+      // Loading state is managed by AuthContext - don't set false here on success
     } catch (err) {
       console.error('Login error:', err);
       setError(err.message || 'Failed to sign in');
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only set false on error
     }
   };
 
+  // ─── Render ────────────────────────────────────────────────
   return (
     <div className={`dea-login-screen ${isDark ? 'dea-login-dark' : ''}`}>
-      {/* Persistent top-left brand mark */}
+      
+      {/* Brand Bar - Top Left */}
       <div className="dea-login-brand-bar">
         <Logo size={18} />
         <span className="dea-login-brand-text">DomusEA</span>
       </div>
 
-      {/* Top-right controls */}
+      {/* Top Controls - Top Right */}
       <div className="dea-login-top-controls">
         {toggleTheme && (
           <button
@@ -85,23 +114,30 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             <span className="dea-login-hide-mobile">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
         )}
+        
         {!isAppInstalled && (
-          <button onClick={handleInstallApp} className="dea-login-pill-btn" aria-label="Download DomusEA App">
+          <button 
+            onClick={handleInstallApp} 
+            className="dea-login-pill-btn" 
+            aria-label="Download DomusEA App"
+          >
             <Smartphone size={17} />
             <span className="dea-login-hide-mobile">Download App</span>
           </button>
         )}
       </div>
 
+      {/* Main Content */}
       <div className="dea-login-main">
-        {/* Condensed hero — mobile/tablet only */}
+        
+        {/* Mobile Hero */}
         <div className="dea-login-hero-mobile">
           <p className="dea-login-quote-header">A WISE QUOTE</p>
           <h1 className="dea-login-mobile-quote">Build Better. Manage Smarter.</h1>
           <p className="dea-login-mobile-tagline">Property Management Redefined</p>
         </div>
 
-        {/* Full hero — desktop only */}
+        {/* Desktop Hero */}
         <div className="dea-login-hero">
           <p className="dea-login-quote-header">A WISE QUOTE</p>
           <h1 className="dea-login-main-quote">Build Better.<br />Manage Smarter.</h1>
@@ -127,14 +163,17 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           </div>
         </div>
 
-        {/* Login card */}
+        {/* Login Card */}
         <div className="dea-login-right-panel">
           <div className="dea-login-card">
+            
+            {/* Card Header */}
             <div className="dea-login-card-header">
               <h2 className="dea-login-welcome-title">Welcome Back</h2>
               <p className="dea-login-welcome-subtitle">Enter your credentials to access your account</p>
             </div>
 
+            {/* Error Message */}
             {(error || authError) && (
               <div className="dea-login-error">
                 <AlertTriangle size={16} />
@@ -142,7 +181,10 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               </div>
             )}
 
+            {/* Login Form */}
             <form className="dea-login-form" onSubmit={handleSubmit}>
+              
+              {/* Email Field */}
               <div className="dea-login-field">
                 <label className="dea-login-label">Email Address</label>
                 <div className="dea-login-input-wrap">
@@ -160,6 +202,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                 </div>
               </div>
 
+              {/* Password Field */}
               <div className="dea-login-field">
                 <label className="dea-login-label">Password</label>
                 <div className="dea-login-input-wrap">
@@ -185,6 +228,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                 </div>
               </div>
 
+              {/* Remember & Forgot */}
               <div className="dea-login-remember-row">
                 <label className="dea-login-checkbox-label">
                   <input type="checkbox" className="dea-login-checkbox" />
@@ -193,6 +237,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                 <a href="/forgot-password" className="dea-login-forgot-link">Forgot password?</a>
               </div>
 
+              {/* Submit Button */}
               <button type="submit" className="dea-login-submit" disabled={loading}>
                 {loading ? (
                   <>
@@ -208,6 +253,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               </button>
             </form>
 
+            {/* Footer */}
             <div className="dea-login-footer">
               <div className="dea-login-footer-row">
                 <div className="dea-login-footer-contact">
@@ -220,17 +266,21 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                     <span className="dea-login-hide-mobile">WhatsApp</span>
                   </a>
                 </div>
-                <p className="dea-login-copyright">© 2026 DomusEA • <span className="dea-login-developer">Elizon Tech</span></p>
+                <p className="dea-login-copyright">
+                  © 2026 DomusEA • <span className="dea-login-developer">Elizon Tech</span>
+                </p>
               </div>
               <div className="dea-login-security">
                 <Shield size={15} />
                 <span>Restricted Access • Authorized Personnel Only</span>
               </div>
             </div>
+
           </div>
         </div>
       </div>
 
+      {/* Styles */}
       <style>{`
         .dea-login-screen, .dea-login-screen * {
           box-sizing: border-box;
@@ -640,7 +690,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
         .dea-login-hide-mobile { display: none; }
 
-        /* ===== Desktop layout ===== */
+        /* Desktop Layout */
         @media (min-width: 1024px) {
           .dea-login-main {
             flex-direction: row;
