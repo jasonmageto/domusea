@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { 
   Moon, Sun, Smartphone, Mail, Lock, Eye, EyeOff, 
-  ArrowRight, Building2, Phone, MessageCircle, Shield, AlertTriangle 
+  ArrowRight, Building2, Phone, MessageCircle, Shield, 
+  AlertTriangle, Search 
 } from "lucide-react";
 
-// ─────────────────────────────────────────────────────────────
-// COMPONENT: Logo
-// ─────────────────────────────────────────────────────────────
+// Logo Component
 function Logo({ size = 20 }) {
   return (
     <span
@@ -28,21 +27,20 @@ function Logo({ size = 20 }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// MAIN COMPONENT: LoginScreen
-// ─────────────────────────────────────────────────────────────
 export default function LoginScreen({ isDark, toggleTheme }) {
-  // ─── State ─────────────────────────────────────────────────
   const { login, error: authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [remember, setRemember] = useState(false);
+  
+  // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
 
-  // ─── PWA Install Handler ───────────────────────────────────
+  // PWA Install Handler
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
@@ -51,6 +49,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsAppInstalled(true);
     }
@@ -61,51 +60,53 @@ export default function LoginScreen({ isDark, toggleTheme }) {
   }, []);
 
   const handleInstallApp = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      // Fallback: redirect to house hunting if no install prompt
+      window.location.href = '/house-hunting';
+      return;
+    }
 
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     
     if (outcome === 'accepted') {
+      console.log('✅ User accepted the install prompt');
       setIsAppInstalled(true);
       setDeferredPrompt(null);
+    } else {
+      console.log('❌ User dismissed the install prompt');
     }
   };
 
-  // ─── Form Submit Handler ───────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Prevent double submission
-    if (loading) return;
-    
     setError('');
     setLoading(true);
 
     try {
       await login(email, password);
-      // Loading state is managed by AuthContext - don't set false here on success
     } catch (err) {
       console.error('Login error:', err);
       setError(err.message || 'Failed to sign in');
-      setLoading(false); // Only set false on error
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ─── Render ────────────────────────────────────────────────
   return (
     <div className={`dea-login-screen ${isDark ? 'dea-login-dark' : ''}`}>
       
-      {/* Brand Bar - Top Left */}
+      {/* Top Left Brand */}
       <div className="dea-login-brand-bar">
         <Logo size={18} />
         <span className="dea-login-brand-text">DomusEA</span>
       </div>
 
-      {/* Top Controls - Top Right */}
+      {/* Top Right Controls */}
       <div className="dea-login-top-controls">
+        {/* Theme Toggle */}
         {toggleTheme && (
-          <button
+          <button 
             onClick={toggleTheme}
             className="dea-login-pill-btn"
             aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
@@ -115,29 +116,34 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           </button>
         )}
         
+        {/* Download App Button */}
         {!isAppInstalled && (
           <button 
-            onClick={handleInstallApp} 
-            className="dea-login-pill-btn" 
+            onClick={handleInstallApp}
+            className="dea-login-pill-btn dea-login-download"
             aria-label="Download DomusEA App"
           >
             <Smartphone size={17} />
             <span className="dea-login-hide-mobile">Download App</span>
           </button>
         )}
+
+        {/* House Hunting Button */}
+        <button 
+          onClick={() => window.location.href = '/house-hunting'}
+          className="dea-login-pill-btn dea-login-cta"
+          aria-label="Go to House Hunting"
+        >
+          <Search size={17} />
+          <span className="dea-login-hide-mobile">House Hunting</span>
+          <ArrowRight size={16} />
+        </button>
       </div>
 
       {/* Main Content */}
       <div className="dea-login-main">
         
-        {/* Mobile Hero */}
-        <div className="dea-login-hero-mobile">
-          <p className="dea-login-quote-header">A WISE QUOTE</p>
-          <h1 className="dea-login-mobile-quote">Build Better. Manage Smarter.</h1>
-          <p className="dea-login-mobile-tagline">Property Management Redefined</p>
-        </div>
-
-        {/* Desktop Hero */}
+        {/* Left Panel - Quote Section (Desktop) */}
         <div className="dea-login-hero">
           <p className="dea-login-quote-header">A WISE QUOTE</p>
           <h1 className="dea-login-main-quote">Build Better.<br />Manage Smarter.</h1>
@@ -145,14 +151,15 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             "The art of building is not just about structures; it's about creating spaces
             where communities thrive. DomusEA handles the details so you can focus on the home."
           </p>
-
-          {!isAppInstalled && (
-            <button onClick={handleInstallApp} className="dea-login-download-btn">
-              <Smartphone size={19} />
-              <span>Download App</span>
-              <ArrowRight size={17} />
-            </button>
-          )}
+          
+          <button 
+            onClick={() => window.location.href = '/house-hunting'}
+            className="dea-login-download-btn"
+          >
+            <Search size={19} />
+            <span>Explore Properties</span>
+            <ArrowRight size={17} />
+          </button>
 
           <div className="dea-login-branding">
             <Logo size={20} />
@@ -163,11 +170,11 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           </div>
         </div>
 
-        {/* Login Card */}
+        {/* Right Panel - Login Form */}
         <div className="dea-login-right-panel">
           <div className="dea-login-card">
             
-            {/* Card Header */}
+            {/* Header */}
             <div className="dea-login-card-header">
               <h2 className="dea-login-welcome-title">Welcome Back</h2>
               <p className="dea-login-welcome-subtitle">Enter your credentials to access your account</p>
@@ -231,14 +238,23 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               {/* Remember & Forgot */}
               <div className="dea-login-remember-row">
                 <label className="dea-login-checkbox-label">
-                  <input type="checkbox" className="dea-login-checkbox" />
+                  <input 
+                    type="checkbox" 
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="dea-login-checkbox" 
+                  />
                   <span>Remember me for 30 days</span>
                 </label>
                 <a href="/forgot-password" className="dea-login-forgot-link">Forgot password?</a>
               </div>
 
               {/* Submit Button */}
-              <button type="submit" className="dea-login-submit" disabled={loading}>
+              <button 
+                type="submit" 
+                className="dea-login-submit"
+                disabled={loading}
+              >
                 {loading ? (
                   <>
                     <span className="dea-login-spinner" />
@@ -261,7 +277,12 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                     <Phone size={15} />
                     <span className="dea-login-hide-mobile">0711 333 436</span>
                   </a>
-                  <a href="https://wa.me/254711333436" target="_blank" rel="noopener noreferrer" className="dea-login-contact-link dea-login-whatsapp">
+                  <a 
+                    href="https://wa.me/254711333436" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="dea-login-contact-link dea-login-whatsapp"
+                  >
                     <MessageCircle size={15} />
                     <span className="dea-login-hide-mobile">WhatsApp</span>
                   </a>
@@ -291,6 +312,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           min-height: 100vh;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
+          /* Light Theme */
           --dea-page-1: #EAF1F8;
           --dea-page-2: #DCE8F2;
           --dea-page-3: #E7EEE9;
@@ -327,6 +349,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         }
 
         .dea-login-screen.dea-login-dark {
+          /* Dark Theme */
           --dea-page-1: #071427;
           --dea-page-2: #0B2545;
           --dea-page-3: #0E2F52;
@@ -402,11 +425,26 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           min-height: 40px;
           min-width: 40px;
           justify-content: center;
-          transition: transform 0.2s ease;
+          transition: all 0.2s ease;
         }
 
         .dea-login-pill-btn:hover {
           transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .dea-login-pill-btn.dea-login-download {
+          background: linear-gradient(90deg, var(--dea-emerald-light) 0%, var(--dea-emerald) 100%);
+          color: #0B2545;
+          border: none;
+          font-weight: 600;
+        }
+
+        .dea-login-pill-btn.dea-login-cta {
+          background: linear-gradient(90deg, #F5C451 0%, var(--dea-amber) 100%);
+          color: #0B2545;
+          border: none;
+          font-weight: 600;
         }
 
         .dea-login-main {
@@ -421,6 +459,14 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           justify-content: center;
         }
 
+        .dea-login-hero {
+          display: none;
+          flex-direction: column;
+          justify-content: center;
+          width: 50%;
+          text-align: left;
+        }
+
         .dea-login-quote-header {
           font-size: 12px;
           font-weight: 700;
@@ -430,39 +476,70 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           margin: 0 0 12px;
         }
 
-        .dea-login-hero-mobile {
-          display: block;
-          text-align: center;
-          width: 100%;
-        }
-
-        .dea-login-mobile-quote {
-          font-size: 28px;
+        .dea-login-main-quote {
+          font-size: 48px;
           font-weight: 800;
-          line-height: 1.15;
+          line-height: 1.1;
           color: var(--dea-text-primary);
-          margin: 0 0 10px;
+          margin: 0 0 24px;
         }
 
-        .dea-login-mobile-tagline {
-          font-size: 14px;
+        .dea-login-quote-text {
+          font-style: italic;
+          font-size: 16px;
+          line-height: 1.6;
           color: var(--dea-text-secondary);
-          margin: 0;
+          margin: 0 0 32px;
+          max-width: 460px;
         }
 
-        .dea-login-hero {
-          display: none;
+        .dea-login-download-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          align-self: flex-start;
+          padding: 14px 26px;
+          border: none;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #F5C451 0%, var(--dea-amber) 100%);
+          color: #0B2545;
+          font-size: 15px;
+          font-weight: 700;
+          cursor: pointer;
+          margin-bottom: 32px;
+          transition: transform 0.2s;
+        }
+
+        .dea-login-download-btn:hover {
+          transform: translateY(-2px);
+        }
+
+        .dea-login-branding {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .dea-login-branding-name {
+          font-weight: 700;
+          font-size: 18px;
+          color: var(--dea-text-primary);
+        }
+
+        .dea-login-branding-tagline {
+          font-size: 13px;
+          color: var(--dea-text-secondary);
         }
 
         .dea-login-right-panel {
           width: 100%;
+          max-width: 440px;
           display: flex;
           justify-content: center;
         }
 
         .dea-login-card {
           width: 100%;
-          max-width: 440px;
           background: var(--dea-card-bg);
           backdrop-filter: blur(28px);
           -webkit-backdrop-filter: blur(28px);
@@ -545,7 +622,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           color: var(--dea-text-primary);
           outline: none;
           font-family: inherit;
-          display: block;
+          transition: all 0.2s;
         }
 
         .dea-login-input:focus {
@@ -561,6 +638,7 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           cursor: pointer;
           color: var(--dea-text-muted);
           display: flex;
+          padding: 4px;
         }
 
         .dea-login-remember-row {
@@ -612,6 +690,11 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           gap: 8px;
           cursor: pointer;
           margin-top: 4px;
+          transition: transform 0.2s;
+        }
+
+        .dea-login-submit:hover:not(:disabled) {
+          transform: translateY(-2px);
         }
 
         .dea-login-submit:disabled {
@@ -629,7 +712,9 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           display: inline-block;
         }
 
-        @keyframes dea-login-spin { to { transform: rotate(360deg); } }
+        @keyframes dea-login-spin {
+          to { transform: rotate(360deg); }
+        }
 
         .dea-login-footer {
           margin-top: 28px;
@@ -659,6 +744,11 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           font-size: 12px;
           color: var(--dea-text-secondary);
           text-decoration: none;
+          transition: color 0.2s;
+        }
+
+        .dea-login-contact-link:hover {
+          color: var(--dea-emerald);
         }
 
         .dea-login-contact-link.dea-login-whatsapp {
@@ -688,7 +778,9 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           text-align: center;
         }
 
-        .dea-login-hide-mobile { display: none; }
+        .dea-login-hide-mobile { 
+          display: none; 
+        }
 
         /* Desktop Layout */
         @media (min-width: 1024px) {
@@ -700,69 +792,27 @@ export default function LoginScreen({ isDark, toggleTheme }) {
             padding: 40px 60px;
           }
 
-          .dea-login-hero-mobile { display: none; }
-
-          .dea-login-hero {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            width: 50%;
+          .dea-login-hero { 
+            display: flex; 
           }
 
-          .dea-login-main-quote {
-            font-size: 52px;
-            font-weight: 800;
-            line-height: 1.1;
-            color: var(--dea-text-primary);
-            margin: 0 0 24px;
+          .dea-login-right-panel { 
+            width: 50%; 
+            max-width: none;
+            justify-content: flex-end; 
           }
 
-          .dea-login-quote-text {
-            font-style: italic;
-            font-size: 17px;
-            line-height: 1.6;
-            color: var(--dea-text-secondary);
-            max-width: 460px;
-            margin: 0 0 32px;
+          .dea-login-card { 
+            padding: 44px 40px; 
           }
 
-          .dea-login-download-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            align-self: flex-start;
-            padding: 14px 26px;
-            border: none;
-            border-radius: 999px;
-            background: linear-gradient(90deg, #F5C451 0%, var(--dea-amber) 100%);
-            color: #0B2545;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            margin-bottom: 32px;
+          .dea-login-welcome-title { 
+            font-size: 32px; 
           }
 
-          .dea-login-branding {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+          .dea-login-hide-mobile { 
+            display: inline; 
           }
-
-          .dea-login-branding-name {
-            font-weight: 700;
-            font-size: 18px;
-            color: var(--dea-text-primary);
-          }
-
-          .dea-login-branding-tagline {
-            font-size: 13px;
-            color: var(--dea-text-secondary);
-          }
-
-          .dea-login-right-panel { width: 50%; justify-content: flex-end; }
-          .dea-login-card { padding: 44px 40px; }
-          .dea-login-welcome-title { font-size: 32px; }
-          .dea-login-hide-mobile { display: inline; }
         }
       `}</style>
     </div>

@@ -5,8 +5,13 @@ import { supabase } from './supabaseClient';
 import { Toaster } from 'react-hot-toast';
 
 // ==========================================
-// COMPONENT IMPORTS - SUPREME ADMIN
+// COMPONENT IMPORTS
 // ==========================================
+import HouseHunting from './components/HouseHunting'; // Import House Hunting
+import LoginScreen from './components/LoginScreen';
+import DownloadAppButton from './components/DownloadAppButton';
+
+// Supreme Admin Imports
 import SADashboard from './components/SADashboard';
 import ManageAdmins from './components/ManageAdmins';
 import PropertyModeration from './components/PropertyModeration';
@@ -17,9 +22,7 @@ import SAAnnouncements from './components/SAAnnouncements';
 import PropertyMap from './components/PropertyMap';
 import Messages from './components/Messages';
 
-// ==========================================
-// COMPONENT IMPORTS - PROPERTY ADMIN
-// ==========================================
+// Property Admin Imports
 import PropertyAdminDashboard from './components/PropertyAdminDashboard';
 import AddPropertyForm from './components/AddPropertyForm';
 import ManageTenants from './components/ManageTenants';
@@ -28,20 +31,12 @@ import AdminPaymentsManager from './components/AdminPaymentsManager';
 import AdminRevenueAnalytics from './components/AdminRevenueAnalytics';
 import ComplaintsManager from './components/ComplaintsManager';
 
-// ==========================================
-// COMPONENT IMPORTS - TENANT
-// ==========================================
+// Tenant Imports
 import TenantDashboard from './components/TenantDashboard';
 import TenantPayRent from './components/TenantPayRent';
 import TenantPaymentHistory from './components/TenantPaymentHistory';
 import TenantRequests from './components/TenantRequests';
 import TenantSettings from './components/TenantSettings';
-
-// ==========================================
-// COMPONENT IMPORTS - AUTH & UI
-// ==========================================
-import LoginScreen from './components/LoginScreen';
-import DownloadAppButton from './components/DownloadAppButton';
 
 // ==========================================
 // SUBSCRIPTION EXPIRED COMPONENT
@@ -302,6 +297,8 @@ const ViewToggle = ({ isDesktopView, onToggle }) => (
 // ==========================================
 function AppContent() {
   const { userProfile, loading, logout, error, refreshAuth } = useAuth();
+  
+  // State for internal tab navigation (Dashboard)
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -312,6 +309,7 @@ function AppContent() {
     return saved === 'desktop';
   });
 
+  // Theme management
   useEffect(() => {
     const savedTheme = localStorage.getItem('domusea-theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -346,6 +344,7 @@ function AppContent() {
 
   const toggleTheme = () => setIsDark(prev => !prev);
 
+  // Responsive menu
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 768) {
@@ -356,10 +355,12 @@ function AppContent() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Reset to dashboard when role changes
   useEffect(() => {
     setActiveTab('dashboard');
   }, [userProfile?.role]);
 
+  // Update prompt logic
   useEffect(() => {
     if (localStorage.getItem('domusea-update-dismissed') === 'true') {
       return;
@@ -405,7 +406,7 @@ function AppContent() {
         const registration = await navigator.serviceWorker.getRegistration();
         
         if (registration?.waiting) {
-          console.log('⏳ Found waiting service worker');
+          console.log(' Found waiting service worker');
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
           
           const timeout = new Promise(resolve => setTimeout(resolve, 5000));
@@ -418,7 +419,7 @@ function AppContent() {
           await Promise.race([activated, timeout]);
         }
       } catch (error) {
-        console.error('❌ Service worker update error:', error);
+        console.error(' Service worker update error:', error);
       }
     }
     
@@ -426,6 +427,7 @@ function AppContent() {
     window.location.href = window.location.href;
   };
 
+  // Auth error recovery
   useEffect(() => {
     if (error && !loading) {
       console.warn('️ Auth error detected:', error);
@@ -437,6 +439,11 @@ function AppContent() {
     }
   }, [error, loading, refreshAuth]);
 
+  // ==========================================
+  // ✅ ROUTING LOGIC - GUEST ACCESS SUPPORT
+  // ==========================================
+
+  // 1️⃣ Show loading spinner while checking auth
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -449,66 +456,27 @@ function AppContent() {
     );
   }
 
-  if (!userProfile) {
-    return <LoginScreen isDark={isDark} toggleTheme={toggleTheme} error={error} />;
+  // 2️⃣ ✅ CHECK FOR HOUSE HUNTING ROUTE (Guest Access)
+  // If the URL is /house-hunting, render HouseHunting regardless of login status
+  if (window.location.pathname === '/house-hunting') {
+    return <HouseHunting />;
   }
 
+  // 3️⃣ If NOT logged in → Show LOGIN PAGE
+  if (!userProfile) {
+    return <LoginScreen isDark={isDark} toggleTheme={toggleTheme} />;
+  }
+
+  // 4️ If admin subscription is overdue → Show frozen screen
   if (userProfile.role === 'admin' && userProfile.subscription_status === 'Overdue') {
     return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
   }
 
-  const getMenuItems = () => {
-    const role = userProfile.role;
-    
-    if (role === 'supreme_admin') {
-      return [
-        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
-        { id: 'property-moderation', label: 'Moderation', icon: 'fas fa-shield-alt' },
-        { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
-        { id: 'manage-admins', label: 'Admins', icon: 'fas fa-users-cog' },
-        { id: 'sa-subscriptions', label: 'Subscriptions', icon: 'fas fa-credit-card' },
-        { id: 'sa-revenue', label: 'Revenue', icon: 'fas fa-chart-bar' },
-        { id: 'sa-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
-        { id: 'sa-announcements', label: 'Announcements', icon: 'fas fa-bullhorn' },
-        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
-      ];
-    }
-    
-    if (role === 'admin') {
-      return [
-        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
-        { id: 'add-property', label: 'Add Property', icon: 'fas fa-plus-circle' },
-        { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
-        { id: 'manage-tenants', label: 'Tenants', icon: 'fas fa-users' },
-        { id: 'occupancy', label: 'Occupancy', icon: 'fas fa-th-large' },
-        { id: 'admin-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
-        { id: 'admin-revenue', label: 'Analytics', icon: 'fas fa-chart-bar' },
-        { id: 'complaints', label: 'Requests', icon: 'fas fa-inbox' },
-        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
-      ];
-    }
-    
-    if (role === 'tenant') {
-      return [
-        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
-        { id: 'pay-rent', label: 'Pay Rent', icon: 'fas fa-credit-card' },
-        { id: 'payment-history', label: 'History', icon: 'fas fa-history' },
-        { id: 'tenant-requests', label: 'Requests', icon: 'fas fa-inbox' },
-        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' },
-        { id: 'settings', label: 'Settings', icon: 'fas fa-cog' }
-      ];
-    }
-    
-    return [];
-  };
-
+  // 5️⃣ Render Dashboard based on Role and Active Tab
   const renderContent = () => {
     const role = userProfile.role;
     
-    console.log('🎯 [APP] Rendering for role:', role, '| Tab:', activeTab);
-    
     if (role === 'supreme_admin') {
-      console.log('✅ Routing to Supreme Admin Dashboard');
       switch (activeTab) {
         case 'dashboard': return <SADashboard />;
         case 'property-moderation': return <PropertyModeration />;
@@ -524,7 +492,6 @@ function AppContent() {
     }
     
     if (role === 'admin') {
-      console.log('✅ Routing to Property Admin Dashboard');
       switch (activeTab) {
         case 'dashboard': return <PropertyAdminDashboard />;
         case 'add-property': return <AddPropertyForm />;
@@ -540,7 +507,6 @@ function AppContent() {
     }
     
     if (role === 'tenant') {
-      console.log('✅ Routing to Tenant Dashboard');
       switch (activeTab) {
         case 'dashboard': return <TenantDashboard />;
         case 'pay-rent': return <TenantPayRent />;
@@ -556,7 +522,7 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="card p-8 text-center max-w-md">
-          <div className="text-5xl mb-4" style={{ fontSize: '3rem' }}>⚠️</div>
+          <div className="text-5xl mb-4" style={{ fontSize: '3rem' }}>️</div>
           <h2 className="text-xl font-bold text-danger mb-2" style={{ fontSize: '1.25rem' }}>Unknown Role</h2>
           <p className="text-muted mb-6" style={{ fontSize: '0.9375rem' }}>
             Your role <code className="px-2 py-1 bg-faint rounded text-sm" style={{ fontSize: '0.8125rem' }}>"{role}"</code> is not recognized.
@@ -575,7 +541,54 @@ function AppContent() {
     );
   };
 
-  const menuItems = getMenuItems();
+  const menuItems = (() => {
+    const role = userProfile.role;
+    
+    if (role === 'supreme_admin') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
+        { id: 'house-hunting', label: '🔍 House Hunting', icon: 'fas fa-search' },
+        { id: 'property-moderation', label: 'Moderation', icon: 'fas fa-shield-alt' },
+        { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
+        { id: 'manage-admins', label: 'Admins', icon: 'fas fa-users-cog' },
+        { id: 'sa-subscriptions', label: 'Subscriptions', icon: 'fas fa-credit-card' },
+        { id: 'sa-revenue', label: 'Revenue', icon: 'fas fa-chart-bar' },
+        { id: 'sa-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
+        { id: 'sa-announcements', label: 'Announcements', icon: 'fas fa-bullhorn' },
+        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
+      ];
+    }
+    
+    if (role === 'admin') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
+        { id: 'house-hunting', label: '🔍 House Hunting', icon: 'fas fa-search' },
+        { id: 'add-property', label: 'Add Property', icon: 'fas fa-plus-circle' },
+        { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
+        { id: 'manage-tenants', label: 'Tenants', icon: 'fas fa-users' },
+        { id: 'occupancy', label: 'Occupancy', icon: 'fas fa-th-large' },
+        { id: 'admin-payments', label: 'Payments', icon: 'fas fa-money-bill-wave' },
+        { id: 'admin-revenue', label: 'Analytics', icon: 'fas fa-chart-bar' },
+        { id: 'complaints', label: 'Requests', icon: 'fas fa-inbox' },
+        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' }
+      ];
+    }
+    
+    if (role === 'tenant') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
+        { id: 'house-hunting', label: '🔍 House Hunting', icon: 'fas fa-search' },
+        { id: 'pay-rent', label: 'Pay Rent', icon: 'fas fa-credit-card' },
+        { id: 'payment-history', label: 'History', icon: 'fas fa-history' },
+        { id: 'tenant-requests', label: 'Requests', icon: 'fas fa-inbox' },
+        { id: 'messages', label: 'Messages', icon: 'fas fa-comments' },
+        { id: 'settings', label: 'Settings', icon: 'fas fa-cog' }
+      ];
+    }
+    
+    return [];
+  })();
+
   const userRole = userProfile.role?.replace('_', ' ') || 'Unknown';
 
   return (
@@ -642,7 +655,7 @@ function AppContent() {
             className="brand"
             onClick={(e) => {
               e.preventDefault();
-              setActiveTab('dashboard');
+              window.location.href = '/'; // Go home
             }}
             aria-label="DomusEA Home"
           >
@@ -662,7 +675,11 @@ function AppContent() {
                   className={activeTab === item.id ? 'active' : ''}
                   onClick={(e) => {
                     e.preventDefault();
-                    setActiveTab(item.id);
+                    if (item.id === 'house-hunting') {
+                      window.location.href = '/house-hunting';
+                    } else {
+                      setActiveTab(item.id);
+                    }
                     setIsMobileMenuOpen(false);
                   }}
                   role="menuitem"
