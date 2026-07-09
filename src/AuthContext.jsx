@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
       
       return { user: parsedUser, token: storedToken };
     } catch (err) {
-      console.warn('🔒 Clearing corrupted auth storage:', err.message);
+      console.warn(' Clearing corrupted auth storage:', err.message);
       localStorage.removeItem('domusea-user');
       localStorage.removeItem('domusea-token');
       localStorage.removeItem('domusea-session');
@@ -55,21 +55,21 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Helper: Check session expiration
+  // Helper: Check session expiration (per Brief: access tied to device/browser)
   const isSessionExpired = useCallback(() => {
     try {
       const ts = localStorage.getItem('domusea-session-ts');
       if (!ts) return true;
       
       const age = Date.now() - parseInt(ts, 10);
-      const MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+      const MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours for auth session
       return age > MAX_AGE;
     } catch {
       return true;
     }
   }, []);
 
-  // Fetch user profile from database
+  // Fetch user profile from database (per Brief: Users, Properties, Landlords entities)
   const fetchUserProfile = useCallback(async (user) => {
     if (isFetchingRef.current) {
       console.log('⏳ [AUTH] Fetch already in progress, skipping');
@@ -77,11 +77,11 @@ export const AuthProvider = ({ children }) => {
     }
     
     isFetchingRef.current = true;
-    console.log('🔍 [AUTH] Fetching profile for:', user.email);
+    console.log('🔍 [AUTH] Fetching profile for:', user.email, '| Auth ID:', user.id);
     setError(null);
 
     try {
-      // Check 1: Supreme Admin
+      // ✅ Check 1: Supreme Admin (hardcoded allowlist per Brief security)
       const supremeEmails = ['4mreaper@gmail.com', 'sa@domusea.com', 'supremeadmin@domusea.com'];
       if (supremeEmails.includes(user.email)) {
         console.log('✅ [AUTH] Supreme Admin detected');
@@ -98,16 +98,16 @@ export const AuthProvider = ({ children }) => {
         return profile;
       }
 
-      // Check 2: Property Admin
-      console.log('🔍 [AUTH] Checking admins table...');
+      // ✅ Check 2: Property Admin (match by EMAIL for reliability)
+      console.log('🔍 [AUTH] Checking admins table by email...');
       const { data: admin, error: adminError } = await supabase
         .from('admins')
         .select('*')
-        .eq('id', user.id)
+        .eq('email', user.email) // ✅ Match by email, not ID (more reliable)
         .maybeSingle();
 
       if (admin && !adminError) {
-        console.log('✅ [AUTH] Property Admin found:', admin.name);
+        console.log('✅ [AUTH] Property Admin found:', admin.name, '| Admin ID:', admin.id);
         
         const profile = {
           id: admin.id,
@@ -122,22 +122,22 @@ export const AuthProvider = ({ children }) => {
           admin_id: admin.id
         };
         
-        console.log('🎯 [AUTH] Role assigned:', profile.role);
+        console.log(' [AUTH] Role assigned:', profile.role);
         setUserProfile(profile);
         setStoredAuth(profile, user.access_token);
         return profile;
       }
 
-      // Check 3: Tenant
-      console.log('🔍 [AUTH] Checking tenants table...');
+      // ✅ Check 3: Tenant (match by EMAIL for reliability)
+      console.log(' [AUTH] Checking tenants table by email...');
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
         .select('*')
-        .eq('id', user.id)
+        .eq('email', user.email) // ✅ Match by email, not ID
         .maybeSingle();
 
       if (tenant && !tenantError) {
-        console.log('✅ [AUTH] Tenant found:', tenant.name);
+        console.log('✅ [AUTH] Tenant found:', tenant.name, '| Tenant ID:', tenant.id);
 
         const profile = {
           id: tenant.id,
@@ -158,13 +158,21 @@ export const AuthProvider = ({ children }) => {
         return profile;
       }
 
-      // Check 4: No profile found
-      console.error('❌ [AUTH] No profile found for user:', user.email);
-      localStorage.removeItem('domusea-user');
-      localStorage.removeItem('domusea-token');
-      setUserProfile(null);
-      setError(`No account found for ${user.email}. Please contact support.`);
-      throw new Error('NO_PROFILE_FOUND');
+      // ✅ Check 4: Guest User (per Brief: guest preview allowed)
+      // If no profile found, allow guest access for House Hunting only
+      console.log('ℹ️ [AUTH] No profile found - allowing guest access for House Hunting');
+      
+      const guestProfile = {
+        id: 'guest_' + user.id,
+        email: user.email,
+        role: 'guest',
+        isGuest: true,
+        name: user.email.split('@')[0]
+      };
+      
+      setUserProfile(guestProfile);
+      setStoredAuth(guestProfile, user.access_token);
+      return guestProfile;
 
     } catch (err) {
       console.error('❌ [AUTH] Profile fetch error:', err);
@@ -234,7 +242,7 @@ export const AuthProvider = ({ children }) => {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.warn('⚠️ [AUTH] Session error:', sessionError.message);
+          console.warn('️ [AUTH] Session error:', sessionError.message);
           localStorage.removeItem('domusea-user');
           localStorage.removeItem('domusea-token');
           if (mounted) {
@@ -247,8 +255,7 @@ export const AuthProvider = ({ children }) => {
         if (mounted && session?.user) {
           await fetchUserProfile(session.user);
         } else if (mounted) {
-          localStorage.removeItem('domusea-user');
-          localStorage.removeItem('domusea-token');
+          // No session - allow guest access
           hasInitializedRef.current = true;
           setLoading(false);
         }
@@ -277,7 +284,7 @@ export const AuthProvider = ({ children }) => {
     };
   }, []); // ✅ EMPTY array - runs only once!
 
-  // Login function
+  // Login function (per Brief: secure authentication)
   const login = useCallback(async (email, password) => {
     try {
       console.log('🔐 [AUTH] Login attempt for:', email);
@@ -308,7 +315,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [fetchUserProfile]);
 
-  // Logout function
+  // Logout function (per Brief: secure authentication)
   const logout = useCallback(async () => {
     try {
       await supabase.auth.signOut();
