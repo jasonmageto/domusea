@@ -1172,8 +1172,6 @@ tbody tr:last-child td { border-bottom: none; }
   }
   .btn-full { width: 100% !important; }
   
-  .flex { flex-direction: column !important; gap: 12px !important; }
-  
   .form-input,
   .form-select,
   .form-textarea {
