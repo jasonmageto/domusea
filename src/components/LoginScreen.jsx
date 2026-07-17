@@ -6,7 +6,6 @@ import {
   AlertTriangle, Search 
 } from "lucide-react";
 
-// Logo Component
 function Logo({ size = 20 }) {
   return (
     <span
@@ -36,11 +35,9 @@ export default function LoginScreen({ isDark, toggleTheme }) {
   const [error, setError] = useState('');
   const [remember, setRemember] = useState(false);
   
-  // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
 
-  // PWA Install Handler
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
@@ -49,7 +46,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsAppInstalled(true);
     }
@@ -61,7 +57,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
 
   const handleInstallApp = async () => {
     if (!deferredPrompt) {
-      // Fallback: redirect to house hunting if no install prompt
       window.location.href = '/house-hunting';
       return;
     }
@@ -73,8 +68,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
       console.log('✅ User accepted the install prompt');
       setIsAppInstalled(true);
       setDeferredPrompt(null);
-    } else {
-      console.log('❌ User dismissed the install prompt');
     }
   };
 
@@ -96,15 +89,12 @@ export default function LoginScreen({ isDark, toggleTheme }) {
   return (
     <div className={`dea-login-screen ${isDark ? 'dea-login-dark' : ''}`}>
       
-      {/* Top Left Brand */}
       <div className="dea-login-brand-bar">
         <Logo size={18} />
         <span className="dea-login-brand-text">DomusEA</span>
       </div>
 
-      {/* Top Right Controls */}
       <div className="dea-login-top-controls">
-        {/* Theme Toggle */}
         {toggleTheme && (
           <button 
             onClick={toggleTheme}
@@ -116,7 +106,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           </button>
         )}
         
-        {/* Download App Button */}
         {!isAppInstalled && (
           <button 
             onClick={handleInstallApp}
@@ -128,7 +117,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           </button>
         )}
 
-        {/* House Hunting Button */}
         <button 
           onClick={() => window.location.href = '/house-hunting'}
           className="dea-login-pill-btn dea-login-cta"
@@ -140,10 +128,8 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         </button>
       </div>
 
-      {/* Main Content */}
       <div className="dea-login-main">
         
-        {/* Left Panel - Quote Section (Desktop) */}
         <div className="dea-login-hero">
           <p className="dea-login-quote-header">A WISE QUOTE</p>
           <h1 className="dea-login-main-quote">Build Better.<br />Manage Smarter.</h1>
@@ -170,17 +156,14 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           </div>
         </div>
 
-        {/* Right Panel - Login Form */}
         <div className="dea-login-right-panel">
           <div className="dea-login-card">
             
-            {/* Header */}
             <div className="dea-login-card-header">
               <h2 className="dea-login-welcome-title">Welcome Back</h2>
               <p className="dea-login-welcome-subtitle">Enter your credentials to access your account</p>
             </div>
 
-            {/* Error Message */}
             {(error || authError) && (
               <div className="dea-login-error">
                 <AlertTriangle size={16} />
@@ -188,17 +171,15 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               </div>
             )}
 
-            {/* Login Form */}
             <form className="dea-login-form" onSubmit={handleSubmit}>
               
-              {/* Email Field */}
               <div className="dea-login-field">
                 <label className="dea-login-label">Email Address</label>
                 <div className="dea-login-input-wrap">
                   <Mail size={17} className="dea-login-input-icon" />
                   <input
                     type="email"
-                    placeholder="name@company.com"
+                    placeholder="Your email address"
                     className="dea-login-input"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -209,7 +190,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                 </div>
               </div>
 
-              {/* Password Field */}
               <div className="dea-login-field">
                 <label className="dea-login-label">Password</label>
                 <div className="dea-login-input-wrap">
@@ -235,7 +215,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                 </div>
               </div>
 
-              {/* Remember & Forgot */}
               <div className="dea-login-remember-row">
                 <label className="dea-login-checkbox-label">
                   <input 
@@ -249,7 +228,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
                 <a href="/forgot-password" className="dea-login-forgot-link">Forgot password?</a>
               </div>
 
-              {/* Submit Button */}
               <button 
                 type="submit" 
                 className="dea-login-submit"
@@ -269,7 +247,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
               </button>
             </form>
 
-            {/* Footer */}
             <div className="dea-login-footer">
               <div className="dea-login-footer-row">
                 <div className="dea-login-footer-contact">
@@ -301,7 +278,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         </div>
       </div>
 
-      {/* Styles */}
       <style>{`
         .dea-login-screen, .dea-login-screen * {
           box-sizing: border-box;
@@ -312,7 +288,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           min-height: 100vh;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-          /* Light Theme */
           --dea-page-1: #EAF1F8;
           --dea-page-2: #DCE8F2;
           --dea-page-3: #E7EEE9;
@@ -324,9 +299,10 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           --dea-emerald-light: #34D399;
           --dea-amber: #F59E0B;
 
-          --dea-card-bg: rgba(255, 255, 255, 0.9);
-          --dea-card-border: rgba(255, 255, 255, 0.6);
-          --dea-card-shadow: 0 25px 60px -15px rgba(11, 37, 69, 0.25);
+          /* --- GLASSMORPHISM LIGHT MODE VARIABLES --- */
+          --dea-card-bg: rgba(255, 255, 255, 0.25);
+          --dea-card-border: rgba(255, 255, 255, 0.4);
+          --dea-card-shadow: 0 8px 32px 0 rgba(11, 37, 69, 0.15);
 
           --dea-text-primary: #0B2545;
           --dea-text-secondary: #33455e;
@@ -349,7 +325,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
         }
 
         .dea-login-screen.dea-login-dark {
-          /* Dark Theme */
           --dea-page-1: #071427;
           --dea-page-2: #0B2545;
           --dea-page-3: #0E2F52;
@@ -357,9 +332,10 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           --dea-glow-amber: rgba(245, 158, 11, 0.14);
           --dea-grid-line: rgba(255, 255, 255, 0.05);
 
-          --dea-card-bg: rgba(11, 37, 69, 0.6);
+          /* --- GLASSMORPHISM DARK MODE VARIABLES --- */
+          --dea-card-bg: rgba(255, 255, 255, 0.05);
           --dea-card-border: rgba(255, 255, 255, 0.1);
-          --dea-card-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.5);
+          --dea-card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 
           --dea-text-primary: #f1f5f9;
           --dea-text-secondary: #cbd5e1;
@@ -538,11 +514,12 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           justify-content: center;
         }
 
+        /* --- GLASSMORPHISM CARD UPDATES --- */
         .dea-login-card {
           width: 100%;
           background: var(--dea-card-bg);
-          backdrop-filter: blur(28px);
-          -webkit-backdrop-filter: blur(28px);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           border: 1px solid var(--dea-card-border);
           border-radius: 28px;
           box-shadow: var(--dea-card-shadow);
@@ -782,7 +759,6 @@ export default function LoginScreen({ isDark, toggleTheme }) {
           display: none; 
         }
 
-        /* Desktop Layout */
         @media (min-width: 1024px) {
           .dea-login-main {
             flex-direction: row;

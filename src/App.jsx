@@ -7,7 +7,7 @@ import { Toaster } from 'react-hot-toast';
 // ==========================================
 // COMPONENT IMPORTS
 // ==========================================
-import HouseHunting from './components/HouseHunting'; // Import House Hunting
+import HouseHunting from './components/HouseHunting';
 import LoginScreen from './components/LoginScreen';
 import DownloadAppButton from './components/DownloadAppButton';
 
@@ -298,18 +298,32 @@ const ViewToggle = ({ isDesktopView, onToggle }) => (
 function AppContent() {
   const { userProfile, loading, logout, error, refreshAuth } = useAuth();
   
-  // State for internal tab navigation (Dashboard)
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  // --- LOADER TRANSITION STATE ---
+  const [showLoader, setShowLoader] = useState(true);
+  const [loaderOpacity, setLoaderOpacity] = useState(1);
   
   const [isDesktopView, setIsDesktopView] = useState(() => {
     const saved = localStorage.getItem('domusea-view-mode');
     return saved === 'desktop';
   });
 
-  // Theme management
+  // Handle Loader Fade Out
+  useEffect(() => {
+    if (!loading) {
+      setLoaderOpacity(0);
+      const timer = setTimeout(() => setShowLoader(false), 500); // 500ms fade duration
+      return () => clearTimeout(timer);
+    } else {
+      setShowLoader(true);
+      setLoaderOpacity(1);
+    }
+  }, [loading]);
+
   useEffect(() => {
     const savedTheme = localStorage.getItem('domusea-theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -344,7 +358,6 @@ function AppContent() {
 
   const toggleTheme = () => setIsDark(prev => !prev);
 
-  // Responsive menu
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 768) {
@@ -355,12 +368,10 @@ function AppContent() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Reset to dashboard when role changes
   useEffect(() => {
     setActiveTab('dashboard');
   }, [userProfile?.role]);
 
-  // Update prompt logic
   useEffect(() => {
     if (localStorage.getItem('domusea-update-dismissed') === 'true') {
       return;
@@ -406,7 +417,7 @@ function AppContent() {
         const registration = await navigator.serviceWorker.getRegistration();
         
         if (registration?.waiting) {
-          console.log(' Found waiting service worker');
+          console.log('🔍 Found waiting service worker');
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
           
           const timeout = new Promise(resolve => setTimeout(resolve, 5000));
@@ -419,18 +430,17 @@ function AppContent() {
           await Promise.race([activated, timeout]);
         }
       } catch (error) {
-        console.error(' Service worker update error:', error);
+        console.error('❌ Service worker update error:', error);
       }
     }
     
-    console.log('🔄 Force reloading...');
+    console.log(' Force reloading...');
     window.location.href = window.location.href;
   };
 
-  // Auth error recovery
   useEffect(() => {
     if (error && !loading) {
-      console.warn('️ Auth error detected:', error);
+      console.warn('⚠️ Auth error detected:', error);
       
       if (error.includes('expired') || error.includes('invalid')) {
         console.log('🔄 Attempting auth recovery...');
@@ -440,45 +450,19 @@ function AppContent() {
   }, [error, loading, refreshAuth]);
 
   // ==========================================
-  // ✅ ROUTING LOGIC - GUEST ACCESS SUPPORT
+  // ✅ ROUTING LOGIC
   // ==========================================
 
-  // 1️⃣ Show loading spinner while checking auth
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
-          <p className="text-muted text-lg font-medium" style={{ fontSize: '1.125rem' }}>Loading DomusEA...</p>
-          <p className="text-muted text-sm mt-2" style={{ fontSize: '0.9375rem' }}>Secure Property Management Platform</p>
-        </div>
-      </div>
-    );
-  }
-
-  // 2️⃣ ✅ CHECK FOR HOUSE HUNTING ROUTE (Guest Access)
-  // If the URL is /house-hunting, render HouseHunting regardless of login status
-  if (window.location.pathname === '/house-hunting') {
-    return <HouseHunting />;
-  }
-
-  // 3️⃣ If NOT logged in → Show LOGIN PAGE
-  if (!userProfile) {
-    return <LoginScreen isDark={isDark} toggleTheme={toggleTheme} />;
-  }
-
-  // 4️ If admin subscription is overdue → Show frozen screen
-  if (userProfile.role === 'admin' && userProfile.subscription_status === 'Overdue') {
-    return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
-  }
-
-  // 5️⃣ Render Dashboard based on Role and Active Tab
+  // Render Dashboard based on Role
   const renderContent = () => {
+    if (!userProfile) return null;
     const role = userProfile.role;
+    
+    console.log('🎯 [APP] Rendering for role:', role, '| Tab:', activeTab);
     
     if (role === 'supreme_admin') {
       switch (activeTab) {
-        case 'dashboard': return <SADashboard />;
+        case 'dashboard': return <SADashboard userProfile={userProfile} />;
         case 'property-moderation': return <PropertyModeration />;
         case 'property-map': return <PropertyMap />;
         case 'manage-admins': return <ManageAdmins />;
@@ -487,13 +471,13 @@ function AppContent() {
         case 'sa-payments': return <SAPayments />;
         case 'sa-announcements': return <SAAnnouncements />;
         case 'messages': return <Messages />;
-        default: return <SADashboard />;
+        default: return <SADashboard userProfile={userProfile} />;
       }
     }
     
     if (role === 'admin') {
       switch (activeTab) {
-        case 'dashboard': return <PropertyAdminDashboard />;
+        case 'dashboard': return <PropertyAdminDashboard userProfile={userProfile} />;
         case 'add-property': return <AddPropertyForm />;
         case 'property-map': return <PropertyMap adminId={userProfile.id} />;
         case 'manage-tenants': return <ManageTenants />;
@@ -502,23 +486,23 @@ function AppContent() {
         case 'admin-revenue': return <AdminRevenueAnalytics />;
         case 'complaints': return <ComplaintsManager />;
         case 'messages': return <Messages />;
-        default: return <PropertyAdminDashboard />;
+        default: return <PropertyAdminDashboard userProfile={userProfile} />;
       }
     }
     
     if (role === 'tenant') {
       switch (activeTab) {
-        case 'dashboard': return <TenantDashboard />;
-        case 'pay-rent': return <TenantPayRent />;
-        case 'payment-history': return <TenantPaymentHistory />;
-        case 'tenant-requests': return <TenantRequests />;
+        case 'dashboard': return <TenantDashboard userProfile={userProfile} />;
+        case 'pay-rent': return <TenantPayRent userProfile={userProfile} />;
+        case 'payment-history': return <TenantPaymentHistory userProfile={userProfile} />;
+        case 'tenant-requests': return <TenantRequests userProfile={userProfile} />;
         case 'messages': return <Messages />;
-        case 'settings': return <TenantSettings />;
-        default: return <TenantDashboard />;
+        case 'settings': return <TenantSettings userProfile={userProfile} />;
+        default: return <TenantDashboard userProfile={userProfile} />;
       }
     }
     
-    console.error('❌ [APP] Unknown role:', role);
+    console.error(' [APP] Unknown role:', role);
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="card p-8 text-center max-w-md">
@@ -541,13 +525,15 @@ function AppContent() {
     );
   };
 
+  // ✅ Menu Items - NO House Hunting for authenticated users
+  // Note: Guarded against null userProfile during initial load
   const menuItems = (() => {
+    if (!userProfile) return [];
     const role = userProfile.role;
     
     if (role === 'supreme_admin') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
-        { id: 'house-hunting', label: '🔍 House Hunting', icon: 'fas fa-search' },
         { id: 'property-moderation', label: 'Moderation', icon: 'fas fa-shield-alt' },
         { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
         { id: 'manage-admins', label: 'Admins', icon: 'fas fa-users-cog' },
@@ -562,7 +548,6 @@ function AppContent() {
     if (role === 'admin') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
-        { id: 'house-hunting', label: '🔍 House Hunting', icon: 'fas fa-search' },
         { id: 'add-property', label: 'Add Property', icon: 'fas fa-plus-circle' },
         { id: 'property-map', label: 'Map', icon: 'fas fa-map-marked-alt' },
         { id: 'manage-tenants', label: 'Tenants', icon: 'fas fa-users' },
@@ -577,7 +562,6 @@ function AppContent() {
     if (role === 'tenant') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
-        { id: 'house-hunting', label: '🔍 House Hunting', icon: 'fas fa-search' },
         { id: 'pay-rent', label: 'Pay Rent', icon: 'fas fa-credit-card' },
         { id: 'payment-history', label: 'History', icon: 'fas fa-history' },
         { id: 'tenant-requests', label: 'Requests', icon: 'fas fa-inbox' },
@@ -589,224 +573,268 @@ function AppContent() {
     return [];
   })();
 
-  const userRole = userProfile.role?.replace('_', ' ') || 'Unknown';
+  const userRole = userProfile?.role?.replace('_', ' ') || 'Unknown';
+
+  // Render the exact layout needed based on state
+  const renderMainLayout = () => {
+    if (window.location.pathname === '/house-hunting' && !userProfile) {
+      return <HouseHunting />;
+    }
+
+    if (!userProfile) {
+      return <LoginScreen isDark={isDark} toggleTheme={toggleTheme} />;
+    }
+
+    if (userProfile.role === 'admin' && userProfile.subscription_status === 'Overdue') {
+      return <SubscriptionExpired userProfile={userProfile} logout={logout} />;
+    }
+
+    return (
+      <div className={`app-wrapper ${isDark ? 'dark' : ''} ${isDesktopView ? 'force-desktop-view' : ''}`}>
+        <Toaster 
+          position="top-right"
+          gutter={12}
+          containerStyle={{ margin: '8px' }}
+          toastOptions={{
+            duration: 4000,
+            success: { 
+              iconTheme: { primary: '#10B981', secondary: '#fff' },
+              style: {
+                background: '#fff',
+                color: '#1F2937',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                border: '1px solid #E5E7EB',
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                padding: '1rem 1.25rem'
+              }
+            },
+            error: { 
+              iconTheme: { primary: '#EF4444', secondary: '#fff' },
+              style: {
+                background: '#fff',
+                color: '#1F2937',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                border: '1px solid #FCA5A5',
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                padding: '1rem 1.25rem'
+              }
+            },
+            loading: {
+              style: {
+                background: '#fff',
+                color: '#1F2937',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                border: '1px solid #93C5FD',
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                padding: '1rem 1.25rem'
+              }
+            }
+          }}
+        />
+
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-white px-4 py-2 rounded-lg z-50"
+          style={{ fontSize: '0.9375rem' }}
+        >
+          Skip to main content
+        </a>
+
+        <nav className="navbar" role="navigation" aria-label="Main navigation">
+          <div className="nav-container" style={{ padding: '0 16px' }}>
+            <a
+              href="#"
+              className="brand"
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab('dashboard');
+              }}
+              aria-label="DomusEA Home"
+            >
+              <i className="fas fa-building"></i>
+              <span>DomusEA</span>
+            </a>
+
+            <ul
+              className={`nav-menu ${isMobileMenuOpen ? 'active' : ''}`}
+              id="navMenu"
+              role="menubar"
+            >
+              {menuItems.map((item) => (
+                <li key={item.id} role="none">
+                  <a
+                    href="#"
+                    className={activeTab === item.id ? 'active' : ''}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setActiveTab(item.id);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    role="menuitem"
+                    aria-current={activeTab === item.id ? 'page' : undefined}
+                  >
+                    <i className={item.icon} aria-hidden="true"></i>
+                    <span>{item.label}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+
+            <div className="nav-actions">
+              <DownloadAppButton />
+              <ViewToggle isDesktopView={isDesktopView} onToggle={toggleViewMode} />
+
+              <button
+                onClick={toggleTheme}
+                className="theme-toggle"
+                aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                title="Toggle theme"
+                style={{ fontSize: '0.875rem' }}
+              >
+                <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
+                <span className="hide-mobile">{isDark ? 'Light' : 'Dark'}</span>
+              </button>
+
+              <div
+                className="user-info"
+                title={`${userProfile?.name} • ${userRole}`}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="user-avatar" aria-hidden="true" style={{ 
+                  fontSize: '0.875rem',
+                  width: '2.25rem',
+                  height: '2.25rem'
+                }}>
+                  {userProfile?.name?.charAt(0).toUpperCase()}
+                  {userProfile?.name?.split(' ')?.[1]?.charAt(0).toUpperCase() || ''}
+                </div>
+                <div className="user-details hide-mobile">
+                  <div className="user-name" style={{ fontSize: '0.875rem' }}>{userProfile?.name}</div>
+                  <div className="user-role" style={{ fontSize: '0.75rem' }}>{userRole}</div>
+                </div>
+              </div>
+
+              <button
+                onClick={logout}
+                className="btn btn-danger btn-sm"
+                title="Logout"
+                aria-label="Logout from your account"
+                style={{ 
+                  fontSize: '0.8125rem', 
+                  padding: '0.625rem 0.875rem' 
+                }}
+              >
+                <i className="fas fa-sign-out-alt"></i>
+                <span className="hide-mobile">Logout</span>
+              </button>
+
+              <button
+                className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label="Toggle navigation menu"
+                aria-expanded={isMobileMenuOpen}
+                aria-controls="navMenu"
+                style={{ width: '2.75rem', height: '2.75rem' }}
+              >
+                <span></span>
+                <span></span>
+                <span></span>
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        <main id="main-content" className="main-content" role="main">
+          {renderContent()}
+        </main>
+
+        <footer className="footer" role="contentinfo">
+          <div className="footer-content">
+            <div className="footer-links">
+              <a href="tel:0711333436" style={{ fontSize: '0.9375rem' }}>
+                <i className="fas fa-phone"></i>
+                <span>0711 333 436</span>
+              </a>
+              <a
+                href="https://wa.me/254711333436"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: '0.9375rem' }}
+              >
+                <i className="fab fa-whatsapp"></i>
+                <span>WhatsApp</span>
+              </a>
+              <a href="#" style={{ fontSize: '0.9375rem' }}>
+                <i className="fas fa-shield-alt"></i>
+                <span>Restricted Access</span>
+              </a>
+            </div>
+            <p className="footer-copyright" style={{ fontSize: '0.8125rem', marginTop: '1rem' }}>
+              © {new Date().getFullYear()} DomusEA. All rights reserved. |
+              Developed by{' '}
+              <a
+                href="https://elizontech.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 'inherit' }}
+              >
+                Elizon Tech
+              </a>
+            </p>
+          </div>
+        </footer>
+
+        {isMobileMenuOpen && (
+          <div
+            className="mobile-overlay"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {updateAvailable && <UpdatePrompt onRefresh={handleUpdateRefresh} />}
+      </div>
+    );
+  };
 
   return (
-    <div className={`app-wrapper ${isDark ? 'dark' : ''} ${isDesktopView ? 'force-desktop-view' : ''}`}>
-      <Toaster 
-        position="top-right"
-        gutter={12}
-        containerStyle={{ margin: '8px' }}
-        toastOptions={{
-          duration: 4000,
-          success: { 
-            iconTheme: { primary: '#10B981', secondary: '#fff' },
-            style: {
-              background: '#fff',
-              color: '#1F2937',
-              borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              border: '1px solid #E5E7EB',
-              fontSize: '0.9375rem',
-              fontWeight: '600',
-              padding: '1rem 1.25rem'
-            }
-          },
-          error: { 
-            iconTheme: { primary: '#EF4444', secondary: '#fff' },
-            style: {
-              background: '#fff',
-              color: '#1F2937',
-              borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              border: '1px solid #FCA5A5',
-              fontSize: '0.9375rem',
-              fontWeight: '600',
-              padding: '1rem 1.25rem'
-            }
-          },
-          loading: {
-            style: {
-              background: '#fff',
-              color: '#1F2937',
-              borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              border: '1px solid #93C5FD',
-              fontSize: '0.9375rem',
-              fontWeight: '600',
-              padding: '1rem 1.25rem'
-            }
-          }
-        }}
-      />
-
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-white px-4 py-2 rounded-lg z-50"
-        style={{ fontSize: '0.9375rem' }}
-      >
-        Skip to main content
-      </a>
-
-      <nav className="navbar" role="navigation" aria-label="Main navigation">
-        <div className="nav-container" style={{ padding: '0 16px' }}>
-          <a
-            href="#"
-            className="brand"
-            onClick={(e) => {
-              e.preventDefault();
-              window.location.href = '/'; // Go home
-            }}
-            aria-label="DomusEA Home"
-          >
-            <i className="fas fa-building"></i>
-            <span>DomusEA</span>
-          </a>
-
-          <ul
-            className={`nav-menu ${isMobileMenuOpen ? 'active' : ''}`}
-            id="navMenu"
-            role="menubar"
-          >
-            {menuItems.map((item) => (
-              <li key={item.id} role="none">
-                <a
-                  href="#"
-                  className={activeTab === item.id ? 'active' : ''}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (item.id === 'house-hunting') {
-                      window.location.href = '/house-hunting';
-                    } else {
-                      setActiveTab(item.id);
-                    }
-                    setIsMobileMenuOpen(false);
-                  }}
-                  role="menuitem"
-                  aria-current={activeTab === item.id ? 'page' : undefined}
-                >
-                  <i className={item.icon} aria-hidden="true"></i>
-                  <span>{item.label}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-
-          <div className="nav-actions">
-            <DownloadAppButton />
-            <ViewToggle isDesktopView={isDesktopView} onToggle={toggleViewMode} />
-
-            <button
-              onClick={toggleTheme}
-              className="theme-toggle"
-              aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-              title="Toggle theme"
-              style={{ fontSize: '0.875rem' }}
-            >
-              <i className={`fas fa-${isDark ? 'sun' : 'moon'}`}></i>
-              <span className="hide-mobile">{isDark ? 'Light' : 'Dark'}</span>
-            </button>
-
-            <div
-              className="user-info"
-              title={`${userProfile?.name} • ${userRole}`}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="user-avatar" aria-hidden="true" style={{ 
-                fontSize: '0.875rem',
-                width: '2.25rem',
-                height: '2.25rem'
-              }}>
-                {userProfile?.name?.charAt(0).toUpperCase()}
-                {userProfile?.name?.split(' ')?.[1]?.charAt(0).toUpperCase() || ''}
-              </div>
-              <div className="user-details hide-mobile">
-                <div className="user-name" style={{ fontSize: '0.875rem' }}>{userProfile?.name}</div>
-                <div className="user-role" style={{ fontSize: '0.75rem' }}>{userRole}</div>
-              </div>
-            </div>
-
-            <button
-              onClick={logout}
-              className="btn btn-danger btn-sm"
-              title="Logout"
-              aria-label="Logout from your account"
-              style={{ 
-                fontSize: '0.8125rem', 
-                padding: '0.625rem 0.875rem' 
-              }}
-            >
-              <i className="fas fa-sign-out-alt"></i>
-              <span className="hide-mobile">Logout</span>
-            </button>
-
-            <button
-              className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle navigation menu"
-              aria-expanded={isMobileMenuOpen}
-              aria-controls="navMenu"
-              style={{ width: '2.75rem', height: '2.75rem' }}
-            >
-              <span></span>
-              <span></span>
-              <span></span>
-            </button>
+    <>
+      {/* 1️⃣ Absolute overlay for smooth loader transition */}
+      {showLoader && (
+        <div 
+          className="flex items-center justify-center min-h-screen"
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 9999,
+            backgroundColor: isDark ? '#071427' : '#F8FAFC', // Smoothly matches theme backgrounds
+            opacity: loaderOpacity,
+            transition: 'opacity 0.4s ease-in-out',
+            pointerEvents: loaderOpacity === 0 ? 'none' : 'auto'
+          }}
+        >
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
+            <p className="text-muted text-lg font-medium" style={{ fontSize: '1.125rem' }}>Loading DomusEA...</p>
+            <p className="text-muted text-sm mt-2" style={{ fontSize: '0.9375rem' }}>Secure Property Management Platform</p>
           </div>
         </div>
-      </nav>
-
-      <main id="main-content" className="main-content" role="main">
-        {renderContent()}
-      </main>
-
-      <footer className="footer" role="contentinfo">
-        <div className="footer-content">
-          <div className="footer-links">
-            <a href="tel:0711333436" style={{ fontSize: '0.9375rem' }}>
-              <i className="fas fa-phone"></i>
-              <span>0711 333 436</span>
-            </a>
-            <a
-              href="https://wa.me/254711333436"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: '0.9375rem' }}
-            >
-              <i className="fab fa-whatsapp"></i>
-              <span>WhatsApp</span>
-            </a>
-            <a href="#" style={{ fontSize: '0.9375rem' }}>
-              <i className="fas fa-shield-alt"></i>
-              <span>Restricted Access</span>
-            </a>
-          </div>
-          <p className="footer-copyright" style={{ fontSize: '0.8125rem', marginTop: '1rem' }}>
-            © {new Date().getFullYear()} DomusEA. All rights reserved. |
-            Developed by{' '}
-            <a
-              href="https://elizontech.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: 'inherit' }}
-            >
-              Elizon Tech
-            </a>
-          </p>
-        </div>
-      </footer>
-
-      {isMobileMenuOpen && (
-        <div
-          className="mobile-overlay"
-          onClick={() => setIsMobileMenuOpen(false)}
-          aria-hidden="true"
-        />
       )}
 
-      {updateAvailable && <UpdatePrompt onRefresh={handleUpdateRefresh} />}
-    </div>
+      {/* 2️⃣ Main Application Container - Only renders when auth is fully resolved */}
+      {!loading && (
+        <div className="animate-fadeIn" style={{ animationDuration: '0.6s' }}>
+          {renderMainLayout()}
+        </div>
+      )}
+    </>
   );
 }
 
