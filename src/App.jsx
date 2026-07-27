@@ -342,18 +342,33 @@ function AppContent() {
     localStorage.setItem('domusea-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  const toggleViewMode = () => {
-    const newMode = !isDesktopView;
-    setIsDesktopView(newMode);
-    localStorage.setItem('domusea-view-mode', newMode ? 'desktop' : 'auto');
-    
-    if (newMode) {
+  // ✅ FIX: previously this body-style sync only ran inside toggleViewMode(),
+  // so it only applied on the click that changed the mode. On a fresh page
+  // load where isDesktopView was restored from localStorage as `true`, the
+  // component got `force-desktop-view` (min-width: 1024px) from CSS, but
+  // document.body never got its matching overflow-x: auto — so the body
+  // stayed at its default overflow-x: hidden and clipped the 1024px-wide
+  // layout down to whatever fit in the phone's viewport. Running this as
+  // its own effect keyed on isDesktopView guarantees the body styles are
+  // (re)applied on every mount and every mode change, not just on click.
+  useEffect(() => {
+    if (isDesktopView) {
       document.body.style.minWidth = '1024px';
       document.body.style.overflowX = 'auto';
     } else {
       document.body.style.minWidth = '';
       document.body.style.overflowX = '';
     }
+    return () => {
+      document.body.style.minWidth = '';
+      document.body.style.overflowX = '';
+    };
+  }, [isDesktopView]);
+
+  const toggleViewMode = () => {
+    const newMode = !isDesktopView;
+    setIsDesktopView(newMode);
+    localStorage.setItem('domusea-view-mode', newMode ? 'desktop' : 'auto');
   };
 
   const toggleTheme = () => setIsDark(prev => !prev);

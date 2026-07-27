@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
 import { toast } from 'react-hot-toast';
+import { CheckCircle, XCircle, Eye } from "lucide-react";
 
 export default function AdminPaymentsManager() {
   const { userProfile } = useAuth();
@@ -10,6 +11,8 @@ export default function AdminPaymentsManager() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMethod, setEditingMethod] = useState(null);
+  const [viewingPayment, setViewingPayment] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null); // Track which payment is being updated
   
   // Form state
   const [formData, setFormData] = useState({
@@ -33,14 +36,27 @@ export default function AdminPaymentsManager() {
   async function fetchData() {
     try {
       setLoading(true);
-      // Fetch payments
+      
+      // Fetch payments with tenant details
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
-        .select('*')
+        .select(`
+          *,
+          tenants:tenant_id (
+            name,
+            house,
+            phone
+          )
+        `)
         .eq('admin_id', userProfile.id)
         .order('date', { ascending: false });
 
-      if (paymentsError) throw paymentsError;
+      if (paymentsError) {
+        console.error('Payments fetch error:', paymentsError);
+        throw paymentsError;
+      }
+      
+      console.log('Fetched payments:', paymentsData);
       setPayments(paymentsData || []);
 
       // Fetch payment methods
@@ -60,6 +76,80 @@ export default function AdminPaymentsManager() {
       setLoading(false);
     }
   }
+
+   // ✅ APPROVE PAYMENT - SIMPLIFIED & FIXED
+  const handleApprovePayment = async (paymentId) => {
+    if (!confirm('Are you sure you want to APPROVE this payment?')) return;
+
+    setUpdatingId(paymentId);
+    
+    try {
+      console.log(' Approving payment:', paymentId);
+      
+      // ✅ REMOVED .select() and updated_at to prevent 400 errors
+      const { error } = await supabase
+        .from('payments')
+        .update({ 
+          status: 'Confirmed'
+        })
+        .eq('id', paymentId);
+
+      if (error) {
+        console.error('❌ Supabase update error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Payment approved successfully');
+      toast.success('Payment approved successfully!');
+      
+      // Refresh data
+      await fetchData();
+      
+    } catch (error) {
+      console.error('Error in handleApprovePayment:', error);
+      // ✅ Show detailed error message
+      toast.error(`Failed: ${error.message || error.details || 'Unknown error'}`);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // ✅ REJECT PAYMENT - SIMPLIFIED & FIXED
+  const handleRejectPayment = async (paymentId) => {
+    const reason = prompt('Enter reason for rejection (optional):') || 'Payment rejected by admin';
+    
+    setUpdatingId(paymentId);
+    
+    try {
+      console.log('🔄 Rejecting payment:', paymentId);
+      
+      // ✅ REMOVED .select() and updated_at
+      const { error } = await supabase
+        .from('payments')
+        .update({ 
+          status: 'Rejected',
+          notes: reason
+        })
+        .eq('id', paymentId);
+
+      if (error) {
+        console.error('❌ Supabase update error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Payment rejected successfully');
+      toast.success('Payment rejected');
+      
+      // Refresh data
+      await fetchData();
+      
+    } catch (error) {
+      console.error('Error in handleRejectPayment:', error);
+      toast.error(`Failed: ${error.message || error.details || 'Unknown error'}`);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -142,13 +232,11 @@ export default function AdminPaymentsManager() {
 
   const handleToggleDefault = async (id) => {
     try {
-      // First, unset all defaults for this admin
       await supabase
         .from('payment_methods')
         .update({ is_default: false })
         .eq('admin_id', userProfile.id);
 
-      // Then set the selected one as default
       const { error } = await supabase
         .from('payment_methods')
         .update({ is_default: true })
@@ -218,9 +306,9 @@ export default function AdminPaymentsManager() {
     const icons = {
       mpesa_personal: '📱',
       mpesa_till: '🏪',
-      mpesa_paybill: '🏦',
-      airtel_money: '📲',
-      t_kash: '💰',
+      mpesa_paybill: '',
+      airtel_money: '',
+      t_kash: '',
       bank_account: '🏛️',
       sasa_pay: '💳',
       pesapal: '🌐',
@@ -242,6 +330,15 @@ export default function AdminPaymentsManager() {
       cash: 'Cash'
     };
     return labels[type] || type;
+  };
+
+  const getStatusBadge = (status) => {
+    const styles = {
+      Confirmed: 'badge-success',
+      Pending: 'badge-warning',
+      Rejected: 'badge-danger'
+    };
+    return styles[status] || 'badge-muted';
   };
 
   if (loading) {
@@ -275,7 +372,7 @@ export default function AdminPaymentsManager() {
         
         {paymentMethods.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: 40, background: 'var(--bg-faint)' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}></div>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
             <h4 style={{ margin: '0 0 8px 0' }}>No Payment Methods Added</h4>
             <p style={{ margin: '0 0 16px 0', color: 'var(--text-muted)' }}>
               Add M-Pesa, Bank Accounts, Airtel Money, etc. for your tenants
@@ -368,7 +465,7 @@ export default function AdminPaymentsManager() {
         )}
       </div>
 
-      {/* Payments Table */}
+      {/* Payments Table with Approval Actions */}
       <div className="card">
         <div className="card-header">
           <h3 style={{ margin: 0 }}>Payment History</h3>
@@ -393,36 +490,98 @@ export default function AdminPaymentsManager() {
                     <th>Method</th>
                     <th>Reference</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id}>
-                      <td>{new Date(p.date).toLocaleDateString()}</td>
-                      <td className="font-semibold">{p.tenant_name || 'Unknown'}</td>
-                      <td className="font-bold">KSh {parseFloat(p.amount).toLocaleString()}</td>
-                      <td>{p.payment_method || 'N/A'}</td>
-                      <td>
-                        <span style={{ 
-                          fontSize: 12, 
-                          background: 'var(--bg-faint)', 
-                          padding: '2px 6px', 
-                          borderRadius: 4,
-                          fontFamily: 'monospace'
-                        }}>
-                          {p.mpesa_code || p.reference || 'N/A'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`badge ${
-                          p.status === 'Confirmed' ? 'badge-success' : 
-                          p.status === 'Pending' ? 'badge-warning' : 'badge-danger'
-                        }`}>
-                          {p.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {payments.map((p) => {
+                    const tenantName = p.tenants?.name || 'Unknown';
+                    const houseNumber = p.tenants?.house || p.reference || 'N/A';
+                    const isUpdating = updatingId === p.id;
+                    
+                    return (
+                      <tr key={p.id} style={{ background: p.status === 'Pending' ? 'var(--warning-bg)' : 'transparent' }}>
+                        <td>{new Date(p.date).toLocaleDateString()}</td>
+                        <td>
+                          <div className="font-semibold">{tenantName}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{houseNumber}</div>
+                        </td>
+                        <td className="font-bold">KSh {parseFloat(p.amount).toLocaleString()}</td>
+                        <td>{p.method || p.payment_method || 'N/A'}</td>
+                        <td>
+                          <span style={{ 
+                            fontSize: 12, 
+                            background: 'var(--bg-faint)', 
+                            padding: '2px 6px', 
+                            borderRadius: 4,
+                            fontFamily: 'monospace'
+                          }}>
+                            {p.mpesa_code || 'N/A'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${getStatusBadge(p.status)}`}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            {/* View Button */}
+                            <button 
+                              onClick={() => setViewingPayment(p)}
+                              className="btn btn-sm btn-secondary"
+                              title="View Details"
+                              disabled={isUpdating}
+                            >
+                              <Eye size={14} />
+                            </button>
+                            
+                            {/* Approve/Reject Buttons - Only for Pending */}
+                            {p.status === 'Pending' && (
+                              <>
+                                <button 
+                                  onClick={() => handleApprovePayment(p.id)}
+                                  className="btn btn-sm"
+                                  style={{
+                                    background: isUpdating ? '#9CA3AF' : '#10B981',
+                                    color: 'white',
+                                    cursor: isUpdating ? 'not-allowed' : 'pointer',
+                                    opacity: isUpdating ? 0.7 : 1
+                                  }}
+                                  title="Approve Payment"
+                                  disabled={isUpdating}
+                                >
+                                  {isUpdating ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                  ) : (
+                                    <CheckCircle size={14} />
+                                  )}
+                                </button>
+                                <button 
+                                  onClick={() => handleRejectPayment(p.id)}
+                                  className="btn btn-sm"
+                                  style={{
+                                    background: isUpdating ? '#9CA3AF' : '#EF4444',
+                                    color: 'white',
+                                    cursor: isUpdating ? 'not-allowed' : 'pointer',
+                                    opacity: isUpdating ? 0.7 : 1
+                                  }}
+                                  title="Reject Payment"
+                                  disabled={isUpdating}
+                                >
+                                  {isUpdating ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                  ) : (
+                                    <XCircle size={14} />
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -430,7 +589,108 @@ export default function AdminPaymentsManager() {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* View Payment Details Modal */}
+      {viewingPayment && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: 20
+        }}>
+          <div className="card" style={{ maxWidth: 500, width: '100%' }}>
+            <div className="card-header">
+              <h3 style={{ margin: 0 }}>Payment Details</h3>
+              <button 
+                onClick={() => setViewingPayment(null)}
+                style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer' }}
+              >
+                
+              </button>
+            </div>
+            <div className="card-body">
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tenant</div>
+                  <div style={{ fontWeight: 600 }}>{viewingPayment.tenants?.name || 'Unknown'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>House/Unit</div>
+                  <div style={{ fontWeight: 600 }}>{viewingPayment.tenants?.house || viewingPayment.reference || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Amount</div>
+                  <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--primary)' }}>
+                    KSh {parseFloat(viewingPayment.amount).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Payment Method</div>
+                  <div>{viewingPayment.method || viewingPayment.payment_method || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>M-Pesa Code</div>
+                  <div style={{ fontFamily: 'monospace', background: 'var(--bg-faint)', padding: '4px 8px', borderRadius: 4, display: 'inline-block' }}>
+                    {viewingPayment.mpesa_code || 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Date</div>
+                  <div>{new Date(viewingPayment.date).toLocaleString()}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Status</div>
+                  <span className={`badge ${getStatusBadge(viewingPayment.status)}`}>
+                    {viewingPayment.status}
+                  </span>
+                </div>
+                {viewingPayment.notes && (
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Notes</div>
+                    <div style={{ fontStyle: 'italic' }}>{viewingPayment.notes}</div>
+                  </div>
+                )}
+                
+                {/* Action Buttons for Pending Payments */}
+                {viewingPayment.status === 'Pending' && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                    <button 
+                      onClick={() => {
+                        handleApprovePayment(viewingPayment.id);
+                        setViewingPayment(null);
+                      }}
+                      className="btn btn-primary flex-1"
+                      disabled={updatingId === viewingPayment.id}
+                    >
+                      <CheckCircle size={16} />
+                      Approve Payment
+                    </button>
+                    <button 
+                      onClick={() => {
+                        handleRejectPayment(viewingPayment.id);
+                        setViewingPayment(null);
+                      }}
+                      className="btn btn-danger flex-1"
+                      disabled={updatingId === viewingPayment.id}
+                    >
+                      <XCircle size={16} />
+                      Reject Payment
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal - Keep existing code */}
       {showAddModal && (
         <div style={{
           position: 'fixed',
