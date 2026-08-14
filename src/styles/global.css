@@ -1301,13 +1301,45 @@ tbody tr:last-child td { border-bottom: none; }
 /* ==========================================
    ✅ VIEW TOGGLE STYLES
    ========================================== */
+
+/*
+  ✅ FIX: This used to also contain:
+
+    .force-desktop-view body {
+      min-width: 1024px !important;
+      overflow-x: auto !important;
+    }
+
+  That selector is DEAD CSS — it can never match anything. `.force-desktop-view`
+  is a class on `.app-wrapper`, which is a CHILD of <body> in the DOM
+  (<body><div class="app-wrapper force-desktop-view">...</div></body>), not
+  an ancestor of it. A descendant selector like `.force-desktop-view body`
+  only matches a <body> element nested *inside* something with that class,
+  which doesn't exist here. So <body> itself never actually received
+  min-width/overflow-x from CSS.
+
+  The only thing that was ever widening the app was `.force-desktop-view`
+  itself (below), which sets min-width on .app-wrapper — but with <body>
+  still stuck at its default `overflow-x: hidden` (see section 2 above),
+  the browser had nowhere to let that extra width scroll to, so on phones
+  it just got clipped down to whatever fit in the viewport ("only a
+  fraction of the screen").
+
+  <body> styles are now set directly in App.jsx via a useEffect keyed on
+  isDesktopView, which is the reliable way to reach an ancestor element
+  from here. The rule below is a same-effect CSS backup for modern
+  browsers that support :has() — if JS is ever slow to apply (e.g. very
+  first paint), this keeps the body from clipping in the meantime.
+*/
 .force-desktop-view {
   min-width: 1024px !important;
 }
-.force-desktop-view body {
-  min-width: 1024px !important;
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch;
+
+@supports selector(:has(*)) {
+  body:has(.force-desktop-view) {
+    min-width: 1024px !important;
+    overflow-x: auto !important;
+  }
 }
 
 .view-toggle-btn {

@@ -5,7 +5,7 @@ import { supabase } from './supabaseClient';
 import { Toaster } from 'react-hot-toast';
 
 // ==========================================
-// COMPONENT IMPORTS
+// COMPONENT IMPORTSa
 // ==========================================
 import HouseHunting from './components/HouseHunting';
 import LoginScreen from './components/LoginScreen';
