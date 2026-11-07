@@ -12,7 +12,7 @@ export default function ManageAdmins() {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
-  
+
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
     admin: null,
@@ -43,25 +43,28 @@ export default function ManageAdmins() {
     }
   }
 
+  // ✅ Toasts now use your real CSS variables (--success/--danger/--warning/
+  // --primary) with getComputedStyle-independent inline fallbacks, so they
+  // render correctly in both light and dark mode.
+  const toastStyle = (borderColor) => ({
+    background: 'var(--bg-card)',
+    color: 'var(--text-primary)',
+    borderRadius: 'var(--radius-xl)',
+    padding: '16px 20px',
+    boxShadow: 'var(--shadow-lg)',
+    border: `2px solid ${borderColor}`,
+    fontWeight: '600',
+  });
+
   const downloadCSV = () => {
     if (admins.length === 0) {
-      toast.error('No admins to export', {
-        style: {
-          background: '#fff',
-          color: '#1F2937',
-          borderRadius: '16px',
-          padding: '16px 20px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-          border: '2px solid #F59E0B',
-          fontWeight: '600',
-        }
-      });
+      toast.error('No admins to export', { style: toastStyle('var(--warning)') });
       return;
     }
 
     const headers = ['Name', 'Email', 'Phone', 'Plan', 'Fee', 'Status', 'Joined'];
     const rows = admins.map(a => [
-      a.name, a.email, a.phone || 'N/A', a.subscription_plan, 
+      a.name, a.email, a.phone || 'N/A', a.subscription_plan,
       a.subscription_fee, a.subscription_status, new Date(a.created_at).toLocaleDateString()
     ]);
     const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
@@ -70,61 +73,31 @@ export default function ManageAdmins() {
     link.href = URL.createObjectURL(blob);
     link.download = `admins_list_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    
-    toast.success('✅ CSV downloaded successfully!', {
-      style: {
-        background: '#fff',
-        color: '#1F2937',
-        borderRadius: '16px',
-        padding: '16px 20px',
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-        border: '2px solid #10B981',
-        fontWeight: '600',
-      }
-    });
+
+    toast.success('✅ CSV downloaded successfully!', { style: toastStyle('var(--success)') });
   };
 
   const downloadPDF = () => {
     if (admins.length === 0) {
-      toast.error('No admins to export', {
-        style: {
-          background: '#fff',
-          color: '#1F2937',
-          borderRadius: '16px',
-          padding: '16px 20px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-          border: '2px solid #EF4444',
-          fontWeight: '600',
-        }
-      });
+      toast.error('No admins to export', { style: toastStyle('var(--danger)') });
       return;
     }
 
-    const loadingToast = toast.loading('📄 Generating PDF...', {
-      style: {
-        background: '#fff',
-        color: '#1F2937',
-        borderRadius: '16px',
-        padding: '16px 20px',
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-        border: '2px solid #3B82F6',
-        fontWeight: '600',
-      }
-    });
+    const loadingToast = toast.loading('📄 Generating PDF...', { style: toastStyle('var(--info)') });
 
     setTimeout(() => {
       try {
         const doc = new jsPDF();
-        
+
         doc.setFontSize(18);
         doc.setTextColor(79, 70, 229);
         doc.text('🏢 DomusEA - Admins Report', 14, 20);
-        
+
         doc.setFontSize(10);
         doc.setTextColor(100, 116, 139);
         doc.text(`Generated: ${new Date().toLocaleString('en-KE')}`, 14, 28);
         doc.text(`Total Admins: ${admins.length}`, 14, 33);
-        
+
         const tableData = admins.map(a => [
           a.name,
           a.email,
@@ -152,30 +125,10 @@ export default function ManageAdmins() {
 
         doc.save(`Admins_${new Date().toISOString().split('T')[0]}.pdf`);
         toast.dismiss(loadingToast);
-        toast.success('✅ PDF downloaded successfully!', {
-          style: {
-            background: '#fff',
-            color: '#1F2937',
-            borderRadius: '16px',
-            padding: '16px 20px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            border: '2px solid #10B981',
-            fontWeight: '600',
-          }
-        });
+        toast.success('✅ PDF downloaded successfully!', { style: toastStyle('var(--success)') });
       } catch (err) {
         toast.dismiss(loadingToast);
-        toast.error('❌ Failed to generate PDF', {
-          style: {
-            background: '#fff',
-            color: '#1F2937',
-            borderRadius: '16px',
-            padding: '16px 20px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            border: '2px solid #EF4444',
-            fontWeight: '600',
-          }
-        });
+        toast.error('❌ Failed to generate PDF', { style: toastStyle('var(--danger)') });
       }
     }, 300);
   };
@@ -238,62 +191,34 @@ export default function ManageAdmins() {
     if (!admin) return;
 
     const loadingToast = toast.loading(`⏳ ${actionType === 'renew' ? 'Renewing' : 'Updating'}...`, {
-      style: {
-        background: '#fff',
-        color: '#1F2937',
-        borderRadius: '16px',
-        padding: '16px 20px',
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-        border: '2px solid #3B82F6',
-        fontWeight: '600',
-      }
+      style: toastStyle('var(--info)')
     });
 
     try {
       if (actionType === 'freeze') {
         const { error } = await supabase
           .from('admins')
-          .update({ 
+          .update({
             frozen: true,
             subscription_status: 'Overdue'
           })
           .eq('id', admin.id);
         if (error) throw error;
         toast.dismiss(loadingToast);
-        toast.success(`❄️ ${admin.name} has been frozen`, {
-          style: {
-            background: '#fff',
-            color: '#1F2937',
-            borderRadius: '16px',
-            padding: '16px 20px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            border: '2px solid #10B981',
-            fontWeight: '600',
-          }
-        });
-        
+        toast.success(`❄️ ${admin.name} has been frozen`, { style: toastStyle('var(--success)') });
+
       } else if (actionType === 'unfreeze') {
         const { error } = await supabase
           .from('admins')
-          .update({ 
+          .update({
             frozen: false,
             subscription_status: 'Active'
           })
           .eq('id', admin.id);
         if (error) throw error;
         toast.dismiss(loadingToast);
-        toast.success(`✅ ${admin.name} has been unfrozen`, {
-          style: {
-            background: '#fff',
-            color: '#1F2937',
-            borderRadius: '16px',
-            padding: '16px 20px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            border: '2px solid #10B981',
-            fontWeight: '600',
-          }
-        });
-        
+        toast.success(`✅ ${admin.name} has been unfrozen`, { style: toastStyle('var(--success)') });
+
       } else if (actionType === 'renew') {
         const newDueDate = new Date();
         newDueDate.setDate(newDueDate.getDate() + 30);
@@ -306,7 +231,7 @@ export default function ManageAdmins() {
             subscription_due: newDueDate.toISOString().split('T')[0]
           })
           .eq('id', admin.id);
-        
+
         if (updateError) throw updateError;
 
         const { error: paymentError } = await supabase
@@ -319,39 +244,19 @@ export default function ManageAdmins() {
             date: new Date().toISOString(),
             description: `Subscription renewal - ${admin.subscription_plan}`
           });
-        
+
         if (paymentError) throw paymentError;
 
         toast.dismiss(loadingToast);
-        toast.success(`✅ Subscription renewed for ${admin.name}!`, {
-          style: {
-            background: '#fff',
-            color: '#1F2937',
-            borderRadius: '16px',
-            padding: '16px 20px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            border: '2px solid #10B981',
-            fontWeight: '600',
-          }
-        });
+        toast.success(`✅ Subscription renewed for ${admin.name}!`, { style: toastStyle('var(--success)') });
       }
 
       fetchAdmins();
-      
+
     } catch (error) {
       console.error('Action error:', error);
       toast.dismiss(loadingToast);
-      toast.error(`❌ Failed: ${error.message}`, {
-        style: {
-          background: '#fff',
-          color: '#1F2937',
-          borderRadius: '16px',
-          padding: '16px 20px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-          border: '2px solid #EF4444',
-          fontWeight: '600',
-        }
-      });
+      toast.error(`❌ Failed: ${error.message}`, { style: toastStyle('var(--danger)') });
     } finally {
       setConfirmationModal(prev => ({ ...prev, isOpen: false }));
     }
@@ -365,62 +270,23 @@ export default function ManageAdmins() {
   return (
     <div>
       {/* ✅ Enhanced Toast Notifications */}
-      <Toaster 
+      <Toaster
         position="top-right"
         gutter={12}
         containerStyle={{ margin: '8px' }}
         toastOptions={{
           duration: 4000,
-          success: { 
-            iconTheme: {
-              primary: '#10B981',
-              secondary: '#fff',
-            },
-            style: {
-              background: '#fff',
-              color: '#1F2937',
-              borderRadius: '16px',
-              padding: '16px 20px',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-              border: '2px solid #10B981',
-              fontWeight: '600',
-              fontSize: '14px',
-              minWidth: '320px',
-            },
+          success: {
+            iconTheme: { primary: '#10B981', secondary: '#fff' },
+            style: { ...toastStyle('var(--success)'), fontSize: '14px', minWidth: '320px' },
           },
-          error: { 
-            iconTheme: {
-              primary: '#EF4444',
-              secondary: '#fff',
-            },
-            style: {
-              background: '#fff',
-              color: '#1F2937',
-              borderRadius: '16px',
-              padding: '16px 20px',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-              border: '2px solid #EF4444',
-              fontWeight: '600',
-              fontSize: '14px',
-              minWidth: '320px',
-            },
+          error: {
+            iconTheme: { primary: '#EF4444', secondary: '#fff' },
+            style: { ...toastStyle('var(--danger)'), fontSize: '14px', minWidth: '320px' },
           },
           loading: {
-            iconTheme: {
-              primary: '#3B82F6',
-              secondary: '#fff',
-            },
-            style: {
-              background: '#fff',
-              color: '#1F2937',
-              borderRadius: '16px',
-              padding: '16px 20px',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-              border: '2px solid #3B82F6',
-              fontWeight: '600',
-              fontSize: '14px',
-              minWidth: '320px',
-            },
+            iconTheme: { primary: '#3B82F6', secondary: '#fff' },
+            style: { ...toastStyle('var(--info)'), fontSize: '14px', minWidth: '320px' },
           },
         }}
       />
@@ -438,11 +304,16 @@ export default function ManageAdmins() {
         type={confirmationModal.type}
       />
 
-      <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12}}>
+      <div className="page-header" style={{marginBottom: 24}}>
         <h2 style={{margin: 0}}>👥 Manage Admins</h2>
-        <div style={{display: 'flex', gap: 12}}>
-          <button onClick={downloadCSV} className="btn" style={{background: 'var(--green)', color: 'white'}}>📊 CSV</button>
-          <button onClick={downloadPDF} className="btn" style={{background: 'var(--red)', color: 'white'}}>📄 PDF</button>
+        <div style={{display: 'flex', gap: 12, flexWrap: 'wrap'}}>
+          {/* ✅ FIX: was var(--green)/var(--red)/var(--amber) — those custom
+              vars don't exist in the stylesheet, so backgrounds resolved to
+              nothing and left white-on-white/invisible buttons. Swapped to
+              the real .btn-success / .btn-danger / .btn-primary classes
+              already defined (and dark-mode-aware) in your CSS. */}
+          <button onClick={downloadCSV} className="btn btn-success btn-sm">📊 CSV</button>
+          <button onClick={downloadPDF} className="btn btn-danger btn-sm">📄 PDF</button>
           <button className="btn btn-primary" onClick={() => setShowCreateForm(!showCreateForm)}>
             {showCreateForm ? 'Cancel' : '+ New Admin'}
           </button>
@@ -462,47 +333,27 @@ export default function ManageAdmins() {
                 options: { data: { name: formData.name, role: 'admin' } }
               });
               if (error) throw error;
-              
-              toast.success('✅ Admin created successfully!', {
-                style: {
-                  background: '#fff',
-                  color: '#1F2937',
-                  borderRadius: '16px',
-                  padding: '16px 20px',
-                  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-                  border: '2px solid #10B981',
-                  fontWeight: '600',
-                }
-              });
-              
+
+              toast.success('✅ Admin created successfully!', { style: toastStyle('var(--success)') });
+
               setShowCreateForm(false);
               fetchAdmins();
             } catch (error) {
-              toast.error(`❌ ${error.message}`, {
-                style: {
-                  background: '#fff',
-                  color: '#1F2937',
-                  borderRadius: '16px',
-                  padding: '16px 20px',
-                  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-                  border: '2px solid #EF4444',
-                  fontWeight: '600',
-                }
-              });
+              toast.error(`❌ ${error.message}`, { style: toastStyle('var(--danger)') });
             } finally {
               setCreating(false);
             }
           }}>
             <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12}}>
-              <input placeholder="Name" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{padding: 10, borderRadius: 8, border: '1px solid var(--border)'}} />
-              <input type="email" placeholder="Email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{padding: 10, borderRadius: 8, border: '1px solid var(--border)'}} />
-              <input type="password" placeholder="Password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} style={{padding: 10, borderRadius: 8, border: '1px solid var(--border)'}} />
-              <input placeholder="Phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} style={{padding: 10, borderRadius: 8, border: '1px solid var(--border)'}} />
-              <input placeholder="Properties" value={formData.properties} onChange={e => setFormData({...formData, properties: e.target.value})} style={{padding: 10, borderRadius: 8, border: '1px solid var(--border)'}} />
-              <input type="number" placeholder="Subscription Fee" value={formData.base_fee} onChange={e => setFormData({...formData, base_fee: e.target.value})} style={{padding: 10, borderRadius: 8, border: '1px solid var(--border)'}} />
+              <input className="form-input" placeholder="Name" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <input className="form-input" type="email" placeholder="Email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+              <input className="form-input" type="password" placeholder="Password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+              <input className="form-input" placeholder="Phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              <input className="form-input" placeholder="Properties" value={formData.properties} onChange={e => setFormData({...formData, properties: e.target.value})} />
+              <input className="form-input" type="number" placeholder="Subscription Fee" value={formData.base_fee} onChange={e => setFormData({...formData, base_fee: e.target.value})} />
             </div>
             <div style={{marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end'}}>
-              <button type="button" className="btn" onClick={() => setShowCreateForm(false)}>Cancel</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowCreateForm(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={creating}>{creating ? 'Creating...' : 'Create Admin'}</button>
             </div>
           </form>
@@ -510,11 +361,11 @@ export default function ManageAdmins() {
       )}
 
       <div className="card">
-        <div style={{overflowX: 'auto'}}>
-          <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: 800}}>
+        <div className="table-container">
+          <table style={{minWidth: 800}}>
             <thead>
-              <tr style={{borderBottom: '2px solid var(--border)'}}>
-                <th style={{padding: '12px 8px'}}>Name</th>
+              <tr>
+                <th>Name</th>
                 <th>Email</th>
                 <th>Plan</th>
                 <th>Fee</th>
@@ -524,28 +375,30 @@ export default function ManageAdmins() {
             </thead>
             <tbody>
               {admins.map((admin) => (
-                <tr key={admin.id} style={{borderBottom: '1px solid var(--border)', opacity: admin.frozen ? 0.6 : 1}}>
-                  <td style={{padding: '12px 8px', fontWeight: 500}}>{admin.name}</td>
-                  <td style={{color: 'var(--gray)', fontSize: 13}}>{admin.email}</td>
+                <tr key={admin.id} style={{opacity: admin.frozen ? 0.6 : 1}}>
+                  <td style={{fontWeight: 500}}>{admin.name}</td>
+                  <td className="text-muted" style={{fontSize: 13}}>{admin.email}</td>
                   <td>{admin.subscription_plan}</td>
                   <td style={{fontWeight: 600}}>KSh {admin.subscription_fee?.toLocaleString()}</td>
                   <td>
-                    <span className={`badge ${admin.frozen ? 'status-red' : 'status-green'}`}>
+                    {/* ✅ FIX: className referenced .status-red/.status-green,
+                        which are never defined in the stylesheet (only
+                        mentioned once inside a mobile media query). Swapped
+                        to the real .badge-danger / .badge-success classes. */}
+                    <span className={`badge ${admin.frozen ? 'badge-danger' : 'badge-success'}`}>
                       {admin.frozen ? '❄️ Frozen' : admin.subscription_status}
                     </span>
                   </td>
                   <td style={{textAlign: 'center'}}>
                     <div style={{display: 'flex', gap: 8, justifyContent: 'center'}}>
-                      <button 
-                        className="btn btn-sm" 
-                        style={{background: 'var(--primary)', color: 'white'}}
+                      <button
+                        className="btn btn-primary btn-sm"
                         onClick={() => handleOpenModal(admin, 'renew')}
                       >
                         Renew
                       </button>
-                      <button 
-                        className="btn btn-sm" 
-                        style={{background: admin.frozen ? 'var(--green)' : 'var(--amber)', color: 'white'}}
+                      <button
+                        className={`btn btn-sm ${admin.frozen ? 'btn-success' : 'btn-warning'}`}
                         onClick={() => handleOpenModal(admin, admin.frozen ? 'unfreeze' : 'freeze')}
                       >
                         {admin.frozen ? 'Unfreeze' : 'Freeze'}

@@ -40,7 +40,7 @@ export default function SARevenueAnalytics() {
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
-      
+
       const thisMonthRevenue = confirmedPayments
         .filter(p => {
           const d = new Date(p.date);
@@ -121,48 +121,104 @@ export default function SARevenueAnalytics() {
     });
   };
 
-  if (loading) return <div style={{textAlign: 'center', padding: 40}}>Loading analytics...</div>;
+  if (loading) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <div>Loading analytics...</div>
+      </div>
+    );
+  }
+
+  const isPositiveGrowth = revenueData.growthRate >= 0;
 
   return (
-    <div>
-      <div style={{marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12}}>
+    <div className="dashboard-wrapper">
+      {/* Header */}
+      <div className="page-header">
         <div>
-          <h2 style={{margin: 0}}>📈 Revenue Analytics</h2>
-          <p style={{color: 'var(--gray)', margin: '4px 0 0 0'}}>Track subscription revenue and growth trends</p>
+          <h2 className="page-title">📈 Revenue Analytics</h2>
+          <p className="page-subtitle">Track subscription revenue and growth trends</p>
         </div>
-        <div style={{display: 'flex', gap: 10}}>
-          <button onClick={downloadCSV} className="btn" style={{background: 'var(--green)', color: 'white'}}>📊 CSV</button>
-          <button onClick={downloadPDF} className="btn" style={{background: 'var(--red)', color: 'white'}}>📄 PDF</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {/* ✅ FIX: var(--green)/var(--red) don't exist in the stylesheet
+              (it's --success/--danger), which left these buttons with no
+              background. Using the real .btn-success/.btn-danger classes. */}
+          <button onClick={downloadCSV} className="btn btn-success btn-sm">📊 CSV</button>
+          <button onClick={downloadPDF} className="btn btn-danger btn-sm">📄 PDF</button>
         </div>
       </div>
 
-      <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 32}}>
-        <div className="card" style={{borderLeft: '4px solid #3b82f6'}}>
-          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>TOTAL REVENUE</div>
-          <div style={{fontSize: 32, fontWeight: 700, color: '#3b82f6'}}>{formatCurrency(revenueData.totalRevenue)}</div>
+      {/* Stat cards — reusing the app's real .stat-card system instead of
+          one-off inline-styled divs, so this matches every other dashboard
+          page and themes correctly in dark mode. */}
+      <div className="stats-grid">
+        <div className="stat-card info">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Total Revenue</div>
+              <div className="stat-value">{formatCurrency(revenueData.totalRevenue)}</div>
+            </div>
+            <div className="stat-icon blue">💰</div>
+          </div>
+          <div className="stat-subtitle">All confirmed payments to date</div>
         </div>
-        <div className="card" style={{borderLeft: '4px solid #10b981'}}>
-          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>AVERAGE MONTHLY</div>
-          <div style={{fontSize: 32, fontWeight: 700, color: '#10b981'}}>{formatCurrency(revenueData.averageMonthly)}</div>
+
+        <div className="stat-card success">
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Average Monthly</div>
+              <div className="stat-value">{formatCurrency(revenueData.averageMonthly)}</div>
+            </div>
+            <div className="stat-icon green">📅</div>
+          </div>
+          <div className="stat-subtitle">Averaged across active months</div>
         </div>
-        <div className="card" style={{borderLeft: '4px solid #f59e0b'}}>
-          <div style={{fontSize: 13, color: 'var(--gray)', marginBottom: 8, fontWeight: 600}}>GROWTH RATE</div>
-          <div style={{fontSize: 32, fontWeight: 700, color: revenueData.growthRate >= 0 ? '#10b981' : '#ef4444'}}>
-            {revenueData.growthRate >= 0 ? '↑' : '↓'} {Math.abs(revenueData.growthRate).toFixed(1)}%
+
+        <div className={`stat-card ${isPositiveGrowth ? 'success' : 'danger'}`}>
+          <div className="stat-header">
+            <div>
+              <div className="stat-label">Growth Rate</div>
+              <div
+                className="stat-value"
+                style={{ color: isPositiveGrowth ? 'var(--success)' : 'var(--danger)' }}
+              >
+                {isPositiveGrowth ? '↑' : '↓'} {Math.abs(revenueData.growthRate).toFixed(1)}%
+              </div>
+            </div>
+            <div className={`stat-icon ${isPositiveGrowth ? 'green' : 'red'}`}>
+              {isPositiveGrowth ? '📈' : '📉'}
+            </div>
+          </div>
+          <div className="stat-subtitle">
+            {formatCurrency(revenueData.thisMonth)} this month vs {formatCurrency(revenueData.lastMonth)} last month
           </div>
         </div>
       </div>
 
+      {/* Summary card */}
       <div className="card">
-        <h3>Revenue Summary</h3>
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16}}>
-          <div style={{padding: 16, background: 'rgba(16, 185, 129, 0.1)', borderRadius: 8}}>
-            <div style={{fontSize: 12, color: 'var(--green)', fontWeight: 600}}>CONFIRMED</div>
-            <div style={{fontSize: 24, fontWeight: 700}}>{revenueData.confirmedPayments}</div>
-          </div>
-          <div style={{padding: 16, background: 'rgba(245, 158, 11, 0.1)', borderRadius: 8}}>
-            <div style={{fontSize: 12, color: 'var(--amber)', fontWeight: 600}}>PENDING</div>
-            <div style={{fontSize: 24, fontWeight: 700}}>{revenueData.pendingPayments}</div>
+        <div className="card-header">
+          <h3 className="card-title">Revenue Summary</h3>
+        </div>
+        <div className="card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div style={{ padding: 16, background: 'var(--success-bg)', borderRadius: 'var(--radius)', border: '1px solid var(--border-primary)' }}>
+              <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Confirmed
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: 'var(--text-primary)' }}>
+                {revenueData.confirmedPayments}
+              </div>
+            </div>
+            <div style={{ padding: 16, background: 'var(--warning-bg)', borderRadius: 'var(--radius)', border: '1px solid var(--border-primary)' }}>
+              <div style={{ fontSize: 12, color: 'var(--warning)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Pending
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: 'var(--text-primary)' }}>
+                {revenueData.pendingPayments}
+              </div>
+            </div>
           </div>
         </div>
       </div>
