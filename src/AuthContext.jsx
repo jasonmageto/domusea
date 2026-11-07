@@ -16,8 +16,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // Refs to prevent race conditions
   const isFetchingRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const initPromiseRef = useRef(null); // ✅ Singleton init pattern
 
   const getStoredAuth = useCallback(() => {
     try {
@@ -66,9 +68,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const fetchUserProfile = useCallback(async (user) => {
+    // ✅ Prevent concurrent fetches
     if (isFetchingRef.current) {
       console.log('⏳ [AUTH] Fetch already in progress, skipping');
-      return;
+      return userProfile;
     }
     
     isFetchingRef.current = true;
@@ -76,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
 
     try {
-      // ✅ Check 1: Supreme Admin
+      // Check 1: Supreme Admin
       const supremeEmails = ['4mreaper@gmail.com', 'sa@domusea.com', 'supremeadmin@domusea.com'];
       if (supremeEmails.includes(user.email)) {
         console.log('✅ [AUTH] Supreme Admin detected');
@@ -93,7 +96,7 @@ export const AuthProvider = ({ children }) => {
         return profile;
       }
 
-      // ✅ Check 2: Property Admin (match by EMAIL)
+      // Check 2: Property Admin (match by EMAIL)
       console.log('🔍 [AUTH] Checking admins table by email...');
       const { data: admin, error: adminError } = await supabase
         .from('admins')
@@ -123,7 +126,7 @@ export const AuthProvider = ({ children }) => {
         return profile;
       }
 
-      // ✅ Check 3: Tenant (match by EMAIL)
+      // Check 3: Tenant (match by EMAIL)
       console.log('🔍 [AUTH] Checking tenants table by email...');
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
@@ -153,20 +156,25 @@ export const AuthProvider = ({ children }) => {
         return profile;
       }
 
-      // ✅ Check 4: No profile found - allow guest access for House Hunting only
-      console.log('ℹ️ [AUTH] No profile found - allowing guest access for House Hunting');
-      
-      const guestProfile = {
-        id: 'guest_' + user.id,
-        email: user.email,
-        role: 'guest',
-        isGuest: true,
-        name: user.email.split('@')[0]
-      };
-      
-      setUserProfile(guestProfile);
-      setStoredAuth(guestProfile, user.access_token);
-      return guestProfile;
+      // Check 4: No profile found - unknown role. Disallow guest access.
+      console.log('⚠️ [AUTH] No profile found - unknown role for user:', user.email);
+
+      // Clear any stored auth and force sign-out to prevent unknown-role access
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutErr) {
+        console.warn('⚠️ [AUTH] Failed to sign out unknown-role user:', signOutErr?.message || signOutErr);
+      }
+
+      localStorage.removeItem('domusea-user');
+      localStorage.removeItem('domusea-token');
+      localStorage.removeItem('domusea-session-ts');
+
+      // Surface a clear error so callers can handle it (login/init will catch this)
+      const err = new Error('UNKNOWN_ROLE');
+      setUserProfile(null);
+      setError('Unknown role');
+      throw err;
 
     } catch (err) {
       console.error('❌ [AUTH] Profile fetch error:', err);
@@ -181,27 +189,83 @@ export const AuthProvider = ({ children }) => {
       throw err;
     } finally {
       isFetchingRef.current = false;
-      if (!hasInitializedRef.current) {
-        hasInitializedRef.current = true;
-        setLoading(false);
-        console.log('✅ [AUTH] Initial loading complete');
-      }
     }
-  }, [setStoredAuth]);
+  }, [setStoredAuth, userProfile]);
 
-  useEffect(() => {
+  // ✅ FIX: Singleton initialization to prevent race conditions
+  const initializeAuth = useCallback(async () => {
+    // If already initialized or initializing, return existing promise
     if (hasInitializedRef.current) {
       console.log('✅ [AUTH] Already initialized, skipping');
       return;
     }
     
-    let mounted = true;
+    if (initPromiseRef.current) {
+      console.log('⏳ [AUTH] Initialization in progress, waiting...');
+      return initPromiseRef.current;
+    }
+
+    // Create a promise to track initialization
+    initPromiseRef.current = (async () => {
+      try {
+        console.log('🚀 [AUTH] Starting initialization...');
+        
+        // 1️⃣ Try localStorage first (fast path)
+        const stored = getStoredAuth();
+        if (stored && !isSessionExpired()) {
+          console.log('♻️ [AUTH] Restoring from localStorage');
+          setUserProfile(stored.user);
+          setLoading(false);
+          hasInitializedRef.current = true;
+          return;
+        }
+
+        // 2️⃣ Clear stale localStorage
+        localStorage.removeItem('domusea-user');
+        localStorage.removeItem('domusea-token');
+        localStorage.removeItem('domusea-session-ts');
+
+        // 3️⃣ Get session from Supabase
+        console.log(' [AUTH] Fetching session from Supabase...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.warn('⚠️ [AUTH] Session error:', sessionError.message);
+          setLoading(false);
+          hasInitializedRef.current = true;
+          return;
+        }
+        
+        if (session?.user) {
+          console.log('👤 [AUTH] Session found, fetching profile...');
+          await fetchUserProfile(session.user);
+        }
+        
+      } catch (err) {
+        console.error('❌ [AUTH] Init failed:', err);
+        localStorage.removeItem('domusea-user');
+        localStorage.removeItem('domusea-token');
+        setUserProfile(null);
+      } finally {
+        setLoading(false);
+        hasInitializedRef.current = true;
+        initPromiseRef.current = null; // ✅ Reset promise ref
+      }
+    })();
+
+    return initPromiseRef.current;
+  }, [getStoredAuth, isSessionExpired, fetchUserProfile]);
+
+  // Main auth effect - runs ONLY ONCE on mount
+  useEffect(() => {
     let authSubscription;
 
-    const handleAuthState = async (event, session) => {
-      if (!mounted || isFetchingRef.current) return;
-      
-      console.log(' [AUTH] State changed:', event);
+    // ✅ Initialize auth (singleton pattern)
+    initializeAuth();
+    
+    // ✅ Setup auth state listener
+    authSubscription = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('📡 [AUTH] State changed:', event);
       
       if (event === 'SIGNED_OUT') {
         setUserProfile(null);
@@ -209,72 +273,29 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('domusea-user');
         localStorage.removeItem('domusea-token');
         localStorage.removeItem('domusea-session-ts');
-        if (!hasInitializedRef.current) {
-          hasInitializedRef.current = true;
-          setLoading(false);
+        hasInitializedRef.current = false;
+        setLoading(false);
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        // ✅ Only fetch if we don't have a profile yet
+        if (!userProfile) {
+          fetchUserProfile(session.user);
         }
-      } else if (session?.user && !userProfile) {
-        await fetchUserProfile(session.user);
-      }
-    };
-
-    const checkSession = async () => {
-      if (hasInitializedRef.current || isFetchingRef.current) return;
-      
-      try {
-        const stored = getStoredAuth();
-        
-        if (stored && !isSessionExpired()) {
-          console.log('♻️ [AUTH] Restoring from localStorage');
-          setUserProfile(stored.user);
-          hasInitializedRef.current = true;
-          setLoading(false);
-          return;
-        }
-
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.warn('⚠️ [AUTH] Session error:', sessionError.message);
-          localStorage.removeItem('domusea-user');
-          localStorage.removeItem('domusea-token');
-          if (mounted) {
-            hasInitializedRef.current = true;
-            setLoading(false);
-          }
-          return;
-        }
-        
-        if (mounted && session?.user) {
-          await fetchUserProfile(session.user);
-        } else if (mounted) {
-          hasInitializedRef.current = true;
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('❌ [AUTH] Session check failed:', err);
-        localStorage.removeItem('domusea-user');
-        localStorage.removeItem('domusea-token');
-        if (mounted) {
-          setUserProfile(null);
-          hasInitializedRef.current = true;
-          setLoading(false);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // ✅ Update token but don't re-fetch profile
+        if (userProfile) {
+          setStoredAuth(userProfile, session.access_token);
         }
       }
-    };
-
-    checkSession();
-    
-    authSubscription = supabase.auth.onAuthStateChange(handleAuthState);
+    });
 
     return () => {
-      console.log('🧹 [AUTH] Cleanup');
-      mounted = false;
+      console.log(' [AUTH] Cleanup');
       if (authSubscription?.subscription) {
         authSubscription.subscription.unsubscribe();
       }
+      initPromiseRef.current = null;
     };
-  }, []);
+  }, []); // ✅ Empty array - runs only once!
 
   const login = useCallback(async (email, password) => {
     try {
@@ -299,29 +320,27 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('❌ [AUTH] Login failed:', err);
       setError(err.message);
+      setLoading(false);
       localStorage.removeItem('domusea-user');
       localStorage.removeItem('domusea-token');
       throw err;
-    } finally {
-      // ✅ GUARANTEE loading is set to false after the login attempt resolves
-      setLoading(false);
     }
   }, [fetchUserProfile]);
 
   const logout = useCallback(async () => {
     try {
+      console.log('🚪 [AUTH] Logout initiated');
       await supabase.auth.signOut();
+      // State change handler will cleanup
+    } catch (err) {
+      console.error('❌ [AUTH] Logout error:', err);
+      // Force cleanup even if Supabase fails
       setUserProfile(null);
       setError(null);
       localStorage.removeItem('domusea-user');
       localStorage.removeItem('domusea-token');
       localStorage.removeItem('domusea-session-ts');
       hasInitializedRef.current = false;
-    } catch (err) {
-      console.error('❌ [AUTH] Logout error:', err);
-      localStorage.removeItem('domusea-user');
-      localStorage.removeItem('domusea-token');
-      setUserProfile(null);
     }
   }, []);
 
@@ -330,6 +349,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     hasInitializedRef.current = false;
+    initPromiseRef.current = null;
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -341,7 +361,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('domusea-token');
       }
     } catch (err) {
-      console.error(' [AUTH] Refresh failed:', err);
+      console.error('❌ [AUTH] Refresh failed:', err);
       setError(err.message);
     } finally {
       setLoading(false);
